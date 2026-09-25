@@ -14,7 +14,7 @@ public static class Qr
     {
         try
         {
-            var bm = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, px, px);
+            var bm = new QRCodeWriter().Encode(text, BarcodeFormat.QR_CODE, px, px);
             int w = bm.Width, h = bm.Height;
             var data = new byte[w * h * 4];
             for (int y = 0; y < h; y++)
@@ -29,7 +29,7 @@ public static class Qr
             using (var fb = wb.Lock())
             {
                 for (int y = 0; y < h; y++)
-                    Marshal.Copy(data, y * w * 4, fb.Address + y * (long)fb.RowBytes, w * 4);
+                    Marshal.Copy(data, y * w * 4, fb.Address + (nint)(y * fb.RowBytes), w * 4);
             }
             return wb;
         }

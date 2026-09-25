@@ -129,7 +129,8 @@ public static class DroidList
             if (cr == null) return res;
             var pu = global::Android.Net.Uri.Parse(parentUri);
             if (pu == null) return res;
-            using var c = global::Android.Provider.DocumentsContract.QueryChildDocuments(cr, pu, null);
+            var childUri = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(pu, pu);
+            using var c = cr.Query(childUri, null, null, null, null);
             if (c == null) return res;
             while (c.MoveToNext())
             {
@@ -193,7 +194,7 @@ public static class DroidPub
             var col = new ContentValues();
             col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, name);
             col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, "application/octet-stream");
-            col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, Environment.Download + "/QBasRecibidos");
+            col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, global::Android.OS.Environment.DirectoryDownloads + "/QBasRecibidos");
             var uri = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
             if (uri == null) return;
             using var os = cr.OpenOutputStream(uri);
@@ -411,7 +412,7 @@ public class ScanActivity : Activity, TextureView.ISurfaceTextureListener, globa
         {
             _cam = global::Android.Hardware.Camera.Open();
             _cam.SetPreviewTexture(surface);
-            var p = _cam.Parameters;
+            var p = _cam.GetParameters();
             var sizes = p.SupportedPreviewSizes;
             if (sizes.Count > 0) p.SetPreviewSize(sizes[sizes.Count - 1].Width, sizes[sizes.Count - 1].Height);
             _cam.SetParameters(p);
@@ -444,7 +445,7 @@ public class ScanActivity : Activity, TextureView.ISurfaceTextureListener, globa
     public void OnPreviewFrame(byte[] data, global::Android.Hardware.Camera camera)
     {
         if (_done || data == null || data.Length == 0) return;
-        var p = camera.Parameters;
+        var p = camera.GetParameters();
         var w = p.PreviewSize.Width;
         var h = p.PreviewSize.Height;
         var txt = Decode(data, w, h);
