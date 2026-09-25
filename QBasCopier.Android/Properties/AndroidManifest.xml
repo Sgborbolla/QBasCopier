@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
-  <application android:label="QBasCopier" android:allowBackup="true"
+  <application android:label="QBasCopier&amp;Transfer" android:allowBackup="true"
                android:theme="@style/MyTheme"
                android:icon="@mipmap/logo"
                android:roundIcon="@mipmap/logo">

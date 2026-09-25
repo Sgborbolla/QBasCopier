@@ -66,7 +66,7 @@ public sealed partial class MainWindow : Window
 
     private const string TabExplorer = "explorer", TabQueue = "queue", TabErrors = "errors", TabOptions = "options", TabHistory = "history";
     private const string AboutText =
-        "QBasCopier crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
+        "QBasCopier&Transfer crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
         "que nació de las manos del Dr. Sergio Grabiel Borbolla Verdecia. Desde Cuba, con el corazón " +
         "lleno de amor por la medicina y por el mundo digital, cada línea se escribe con esfuerzo y " +
         "esperanza, aunque a veces la tecnología no alcance. Este es un pequeño homenaje a la idea de " +
@@ -80,7 +80,7 @@ public sealed partial class MainWindow : Window
         _logo = LoadLogo();
         Icon = _logo;
 #endif
-        Title = "QBasCopier";
+        Title = "QBasCopier&Transfer";
         BuildWindow();
         _ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Clamp(S.WindowUpdateMs, 50, 1000)) };
         _ticker.Tick += (_, _) => Tick();
@@ -221,7 +221,7 @@ public sealed partial class MainWindow : Window
             ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) },
             Margin = new Thickness(8, 4)
         };
-        var brand = new TextBlock { Text = "QBasCopier", FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0) };
+        var brand = new TextBlock { Text = "QBasCopier&Transfer", FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0) };
         Grid.SetColumn(brand, 0);
         bar.Children.Add(brand);
 
@@ -604,7 +604,7 @@ public sealed partial class MainWindow : Window
         col.Children.Add(bottom);
 
         var about = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
-        var aboutT = MkLbl("Acerca de QBasCopier", 13);
+        var aboutT = MkLbl("Acerca de QBasCopier&Transfer", 13);
         aboutT.FontWeight = FontWeight.Bold;
         aboutT.Foreground = Gold;
         about.Children.Add(aboutT);
@@ -666,7 +666,7 @@ public sealed partial class MainWindow : Window
     private Control BuildStatusbar()
     {
         var bar = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, Margin = new Thickness(8, 0, 8, 3) };
-        _lblStatus = MkLbl("QBasCopier 1.0.0", 12);
+        _lblStatus = MkLbl("QBasCopier&Transfer 1.0.0", 12);
         Grid.SetColumn(_lblStatus, 0);
         bar.Children.Add(_lblStatus);
         var ver = MkLbl("© 2026", 12);
@@ -840,12 +840,12 @@ public sealed partial class MainWindow : Window
             _lblCur.Text = cur != null ? $"{L.Get("currentFile")}: {cur.Name}" : "";
             _miniLbl.Text = _lblProg.Text + "  " + _lblRate.Text;
             _miniBar.Value = pct;
-            if (S.ShowInTitle) Title = $"QBasCopier · {pct:0.#}%";
+            if (S.ShowInTitle) Title = $"QBasCopier&Transfer · {pct:0.#}%";
         }
         else
         {
             _lastTickTicks = 0;
-            if (S.ShowInTitle) Title = "QBasCopier";
+            if (S.ShowInTitle) Title = "QBasCopier&Transfer";
         }
 
         var cmd = Program.WaitCommand(0);
@@ -1130,9 +1130,9 @@ public sealed partial class MainWindow : Window
         {
             if (_tray != null) { _tray.IsVisible = false; _tray.Dispose(); _tray = null; }
             if (!S.TrayIcon || _logoBmp == null) return;
-            _tray = new TrayIcon { Icon = new WindowIcon(_logoBmp), ToolTipText = "QBasCopier", IsVisible = true };
+            _tray = new TrayIcon { Icon = new WindowIcon(_logoBmp), ToolTipText = "QBasCopier&Transfer", IsVisible = true };
             _tray.Menu = new NativeMenu();
-            var mOpen = new NativeMenuItem("QBasCopier");
+            var mOpen = new NativeMenuItem("QBasCopier&Transfer");
             mOpen.Click += (s, e) => { Show(); Activate(); };
             var mQuit = new NativeMenuItem(L.Get("quit"));
             mQuit.Click += (s, e) => DoQuit();
