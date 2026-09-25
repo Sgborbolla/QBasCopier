@@ -15,7 +15,7 @@ using System.IO;
 
 namespace QBasCopier;
 
-public sealed class MainWindow : Window
+public sealed partial class MainWindow : Window
 {
     public static Settings S = new();
 
