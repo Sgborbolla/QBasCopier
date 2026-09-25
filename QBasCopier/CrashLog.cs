@@ -13,7 +13,7 @@ public static class CrashLog
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Save("UNHANDLED " + (e.ExceptionObject?.ToString() ?? "?"));
         System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, e) => Save("TASK " + e.Exception);
 #if ANDROID
-        Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, e) => Save("JAVA " + e.Exception);
+        global::Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, e) => Save("JAVA " + e.Exception);
 #endif
     }
 
@@ -30,7 +30,7 @@ public static class CrashLog
 #if ANDROID
                 try
                 {
-                    var ctx = Android.App.Application.Context;
+                    var ctx = global::Android.App.Application.Context;
                     var cd = ctx?.GetExternalFilesDir(null) ?? ctx?.CacheDir;
                     if (cd != null)
                     {
@@ -44,7 +44,7 @@ public static class CrashLog
                 try
                 {
                     var m = msg.Length > 160 ? msg[..160] : msg;
-                    Android.Widget.Toast.MakeText(Android.App.Application.Context, m, Android.Widget.ToastLength.Long)?.Show();
+                    global::Android.Widget.Toast.MakeText(global::Android.App.Application.Context, m, global::Android.Widget.ToastLength.Long)?.Show();
                 }
                 catch { }
 #else
