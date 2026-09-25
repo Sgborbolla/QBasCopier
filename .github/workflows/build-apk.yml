@@ -20,13 +20,16 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Fijar SDK 8 para el build (el runner preinstala el 10 y se adelanta)
+      - name: Fijar SDK 8 para el build (el runner preinstala 9/10 y se adelantan)
         run: |
           set -e
-          for d in /usr/share/dotnet/sdk/10.*; do
-            [ -d "$d" ] && sudo rm -rf "$d"
+          for d in /usr/share/dotnet/sdk/*; do
+            [ -d "$d" ] || continue
+            case "$(basename "$d")" in
+              8.*) continue ;;
+              *) sudo rm -rf "$d" ;;
+            esac
           done
-          echo "dotnet --version => $(dotnet --version)"
           dotnet --list-sdks
           [ "$(dotnet --version | cut -d. -f1)" = "8" ] || { echo "FALLO: no quedó el SDK 8"; exit 1; }
 
