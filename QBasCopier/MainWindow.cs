@@ -1099,7 +1099,7 @@ public sealed class MainWindow : Window
     }
 
     // ----------------------------------------------------------- util
-    private static Button Mk(string text, Action? act) => new() { Content = text, FontSize = 12, Margin = new Thickness(2) }.Also(b => { if (act != null) b.Click += (s, e) => act(); });
+    private static Button Mk(string text, Action? act) => new() { Content = L.Get(text), FontSize = 12, Margin = new Thickness(2) }.Also(b => { if (act != null) b.Click += (s, e) => act(); });
 
     private static TextBlock MkLbl(string t, int size) => new() { Text = t, FontSize = size, Foreground = TextMain, VerticalAlignment = VerticalAlignment.Center };
 

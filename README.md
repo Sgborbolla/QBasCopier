@@ -48,6 +48,8 @@ Resultado en `dist\Windows\`:
 ```
 ./build-android.sh        # instala workload android (1 vez), genera el .apk
 ```
+El proyecto Android apunta a `net8.0-android` (LTS estable; .NET 10 aún no
+publica el pack host Mono de Linux necesario para compilar en la nube).
 > Nota experimental: usa los permisos clásicos de almacenamiento (until API 32).
 > Para Android 13+ se adaptaría con SAF (DocumentProvider) en una v2.
 
@@ -83,5 +85,5 @@ velocidad/throttle), prioridad, verificación SHA-256, aviso de espacio libre.
 Ver `LICENSES.txt`.
 
 ## Requisitos de compilación
-- .NET SDK 10: https://dotnet.microsoft.com/download/dotnet/10.0
-- Android: `dotnet workload install android`
+- .NET SDK 10 (escritorio): https://dotnet.microsoft.com/download/dotnet/10.0
+- Android: .NET SDK 8 (LTS) + `dotnet workload install android`

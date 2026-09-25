@@ -26,9 +26,9 @@
 
   <ItemGroup>
     <!-- Generado por build.bat: publish portable del programa principal -->
-    <Resource Include="Assets\app.exe" />
+    <Resource Include="Assets\app.exe" Condition="Exists('Assets\app.exe')" />
     <Resource Include="Assets\logo.png" />
-    <Resource Include="Assets\music.mp3" />
+    <Resource Include="Assets\music.mp3" Condition="Exists('Assets\music.mp3')" />
     <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
