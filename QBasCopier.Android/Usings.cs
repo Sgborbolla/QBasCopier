@@ -1,5 +1,5 @@
 // Alias globales SOLO para el proyecto Android (no afectan al escritorio).
-// Con net8.0-android, el SDK inyecta usings de Android.*/Java.* que chocan
+// Con net8.0-android, el SDK inyecta usings de global::Android.*/Java.* que chocan
 // con los nombres de Avalonia y System.*; estos alias ganan siempre.
 global using Application = Avalonia.Application;
 global using Button = Avalonia.Controls.Button;

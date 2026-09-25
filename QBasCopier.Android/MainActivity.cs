@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using Android.App;
-using Android.Content;
-using Android.Content.PM;
-using Android.Graphics;
-using Android.OS;
-using Android.Views;
+using global::Android.App;
+using global::Android.Content;
+using global::Android.Content.PM;
+using global::Android.Graphics;
+using global::Android.OS;
+using global::Android.Views;
 using Avalonia.Android;
 
 namespace QBasCopier.Android;
@@ -18,7 +18,7 @@ public static class DroidFile
         if (cr == null) return ("archivo.bin", 0);
         try
         {
-            var u = Android.Net.Uri.Parse(uri);
+            var u = global::Android.Net.Uri.Parse(uri);
             if (u == null) return ("archivo.bin", 0);
             string name = "archivo.bin";
             long size = 0;
@@ -29,9 +29,9 @@ public static class DroidFile
                 {
                     if (c.MoveToFirst())
                     {
-                        int ni = c.GetColumnIndex(Android.Provider.OpenableColumns.DisplayName);
+                        int ni = c.GetColumnIndex(global::Android.Provider.OpenableColumns.DisplayName);
                         if (ni >= 0) name = c.GetString(ni) ?? name;
-                        int si = c.GetColumnIndex(Android.Provider.OpenableColumns.Size);
+                        int si = c.GetColumnIndex(global::Android.Provider.OpenableColumns.Size);
                         if (si >= 0 && !c.IsNull(si)) size = c.GetLong(si);
                     }
                 }
@@ -48,7 +48,7 @@ public static class DroidFile
         if (cr == null) return Stream.Null;
         try
         {
-            var u = Android.Net.Uri.Parse(uri);
+            var u = global::Android.Net.Uri.Parse(uri);
             return u == null ? Stream.Null : (cr.OpenInputStream(u) ?? Stream.Null);
         }
         catch { return Stream.Null; }
@@ -63,9 +63,9 @@ public static class DroidDir
         {
             var cr = MainActivity.Current?.ContentResolver;
             if (cr == null) return null;
-            var tu = Android.Net.Uri.Parse(treeUri);
+            var tu = global::Android.Net.Uri.Parse(treeUri);
             if (tu == null) return null;
-            var doc = Android.Provider.DocumentsContract.CreateDocument(
+            var doc = global::Android.Provider.DocumentsContract.CreateDocument(
                 cr, tu, "application/octet-stream", fileName);
             if (doc == null) return null;
             return cr.OpenOutputStream(doc);
@@ -79,9 +79,9 @@ public static class DroidDir
         {
             var cr = MainActivity.Current?.ContentResolver;
             if (cr == null) return "";
-            var tu = Android.Net.Uri.Parse(treeUri);
+            var tu = global::Android.Net.Uri.Parse(treeUri);
             if (tu == null) return "";
-            var doc = Android.Provider.DocumentsContract.CreateDocument(
+            var doc = global::Android.Provider.DocumentsContract.CreateDocument(
                 cr, tu, "application/octet-stream", fileName);
             if (doc == null) return "";
             using var os = cr.OpenOutputStream(doc);
@@ -111,10 +111,10 @@ public static class DroidList
         {
             var cr = MainActivity.Current?.ContentResolver;
             if (cr == null) return treeUri;
-            var tu = Android.Net.Uri.Parse(treeUri);
+            var tu = global::Android.Net.Uri.Parse(treeUri);
             if (tu == null) return treeUri;
-            var treeDoc = Android.Provider.DocumentsContract.GetTreeDocumentId(tu);
-            return Android.Provider.DocumentsContract.BuildDocumentUriUsingTree(tu, treeDoc).ToString();
+            var treeDoc = global::Android.Provider.DocumentsContract.GetTreeDocumentId(tu);
+            return global::Android.Provider.DocumentsContract.BuildDocumentUriUsingTree(tu, treeDoc).ToString();
         }
         catch { return treeUri; }
     }
@@ -127,24 +127,24 @@ public static class DroidList
         {
             var cr = MainActivity.Current?.ContentResolver;
             if (cr == null) return res;
-            var pu = Android.Net.Uri.Parse(parentUri);
+            var pu = global::Android.Net.Uri.Parse(parentUri);
             if (pu == null) return res;
-            using var c = Android.Provider.DocumentsContract.QueryChildDocuments(cr, pu, null);
+            using var c = global::Android.Provider.DocumentsContract.QueryChildDocuments(cr, pu, null);
             if (c == null) return res;
             while (c.MoveToNext())
             {
-                int ciName = c.GetColumnIndex(Android.Provider.DocumentsContract.Document.ColumnDisplayName);
+                int ciName = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDisplayName);
                 string name = ciName >= 0 ? c.GetString(ciName) ?? "" : "";
-                int ciMime = c.GetColumnIndex(Android.Provider.DocumentsContract.Document.ColumnMimeType);
+                int ciMime = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnMimeType);
                 string mime = ciMime >= 0 ? c.GetString(ciMime) ?? "" : "";
-                int ciId = c.GetColumnIndex(Android.Provider.DocumentsContract.Document.ColumnDocumentId);
+                int ciId = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDocumentId);
                 string docId = ciId >= 0 ? c.GetString(ciId) ?? "" : "";
                 if (name.Length == 0 || docId.Length == 0) continue;
                 long size = 0;
-                int si = c.GetColumnIndex(Android.Provider.DocumentsContract.Document.ColumnSize);
+                int si = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnSize);
                 if (si >= 0 && !c.IsNull(si)) size = c.GetLong(si);
-                bool isDir = mime == Android.Provider.DocumentsContract.Document.MimeTypeDir;
-                var childUri = Android.Provider.DocumentsContract.BuildDocumentUri(pu.Authority, docId);
+                bool isDir = mime == global::Android.Provider.DocumentsContract.Document.MimeTypeDir;
+                var childUri = global::Android.Provider.DocumentsContract.BuildDocumentUri(pu.Authority, docId);
                 res.Add((childUri.ToString(), name, isDir, size));
             }
         }
@@ -158,7 +158,7 @@ public static class DroidList
         if (cr == null) return Stream.Null;
         try
         {
-            var u = Android.Net.Uri.Parse(uri);
+            var u = global::Android.Net.Uri.Parse(uri);
             return u == null ? Stream.Null : (cr.OpenInputStream(u) ?? Stream.Null);
         }
         catch { return Stream.Null; }
@@ -170,7 +170,7 @@ public static class DroidList
         {
             var ctx = MainActivity.Current;
             if (ctx == null) return;
-            var u = Android.Net.Uri.Parse(uri);
+            var u = global::Android.Net.Uri.Parse(uri);
             if (u == null) return;
             var i = new Intent(Intent.ActionView);
             i.SetDataAndType(u, "*/*");
@@ -191,10 +191,10 @@ public static class DroidPub
             if (cr == null) return;
             var name = Path.GetFileName(filePath);
             var col = new ContentValues();
-            col.Put(Android.Provider.MediaStore.MediaColumns.DisplayName, name);
-            col.Put(Android.Provider.MediaStore.MediaColumns.MimeType, "application/octet-stream");
-            col.Put(Android.Provider.MediaStore.MediaColumns.RelativePath, Environment.Download + "/QBasRecibidos");
-            var uri = cr.Insert(Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
+            col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, name);
+            col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, "application/octet-stream");
+            col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, Environment.Download + "/QBasRecibidos");
+            var uri = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
             if (uri == null) return;
             using var os = cr.OpenOutputStream(uri);
             using var rd = new FileStream(filePath, FileMode.Open, FileAccess.Read);
@@ -210,7 +210,7 @@ public static class DroidCtx
     {
         try
         {
-            Android.Widget.Toast.MakeText(Android.App.Application.Context, msg, Android.Widget.ToastLength.Short)?.Show();
+            global::Android.Widget.Toast.MakeText(global::Android.App.Application.Context, msg, global::Android.Widget.ToastLength.Short)?.Show();
         }
         catch { }
     }
@@ -304,7 +304,7 @@ public class MainActivity : AvaloniaMainActivity<App>
             foreach (var u in uris)
                 try
                 {
-                    ContentResolver!.TakePersistableUriPermission(Android.Net.Uri.Parse(u), ActivityFlags.GrantReadUriPermission);
+                    ContentResolver!.TakePersistableUriPermission(global::Android.Net.Uri.Parse(u), ActivityFlags.GrantReadUriPermission);
                 }
                 catch { }
             _pickerCb(uris.ToArray());
@@ -330,7 +330,7 @@ public class MainActivity : AvaloniaMainActivity<App>
                 }
                 else
                 {
-                    StartActivity(new Intent(Android.Provider.Settings.ActionWirelessSettings));
+                    StartActivity(new Intent(global::Android.Provider.Settings.ActionWirelessSettings));
                 }
             }
             catch { }
@@ -343,8 +343,8 @@ public class MainActivity : AvaloniaMainActivity<App>
         {
             try
             {
-                var i = new Intent(Android.Provider.Settings.ActionWirelessSettings);
-                i.AddFlags(Android.Content.ActivityFlags.NewTask);
+                var i = new Intent(global::Android.Provider.Settings.ActionWirelessSettings);
+                i.AddFlags(global::Android.Content.ActivityFlags.NewTask);
                 StartActivity(i);
                 done(true, "");
             }
@@ -355,12 +355,12 @@ public class MainActivity : AvaloniaMainActivity<App>
     public void StartScan()
     {
         if (Build.VERSION.SdkInt < BuildVersionCodes.M ||
-            CheckSelfPermission(Android.Manifest.Permission.Camera) == Permission.Granted)
+            CheckSelfPermission(global::Android.Manifest.Permission.Camera) == Permission.Granted)
         {
             ScanActivity.Launch(this);
             return;
         }
-        RequestPermissions(new[] { Android.Manifest.Permission.Camera }, ReqCamPerm);
+        RequestPermissions(new[] { global::Android.Manifest.Permission.Camera }, ReqCamPerm);
     }
 
     public override void OnRequestPermissionsResult(int requestCode, string?[]? permissions, Permission[]? grantResults)
@@ -373,9 +373,9 @@ public class MainActivity : AvaloniaMainActivity<App>
 
 [Activity(Theme = "@style/MyTheme",
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.Density)]
-public class ScanActivity : Activity, TextureView.ISurfaceTextureListener, Android.Hardware.Camera.IPreviewCallback
+public class ScanActivity : Activity, TextureView.ISurfaceTextureListener, global::Android.Hardware.Camera.IPreviewCallback
 {
-    private Android.Hardware.Camera? _cam;
+    private global::Android.Hardware.Camera? _cam;
     private TextureView? _view;
     private bool _done;
 
@@ -409,7 +409,7 @@ public class ScanActivity : Activity, TextureView.ISurfaceTextureListener, Andro
     {
         try
         {
-            _cam = Android.Hardware.Camera.Open();
+            _cam = global::Android.Hardware.Camera.Open();
             _cam.SetPreviewTexture(surface);
             var p = _cam.Parameters;
             var sizes = p.SupportedPreviewSizes;
@@ -441,7 +441,7 @@ public class ScanActivity : Activity, TextureView.ISurfaceTextureListener, Andro
         base.OnDestroy();
     }
 
-    public void OnPreviewFrame(byte[] data, Android.Hardware.Camera camera)
+    public void OnPreviewFrame(byte[] data, global::Android.Hardware.Camera camera)
     {
         if (_done || data == null || data.Length == 0) return;
         var p = camera.Parameters;
