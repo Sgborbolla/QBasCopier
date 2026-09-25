@@ -15,7 +15,7 @@ public static class Qr
     {
         try
         {
-            var bm = new QRCodeWriter().Encode(text, BarcodeFormat.QR_CODE, px, px);
+            var bm = new QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, px, px);
             int w = bm.Width, h = bm.Height;
             var data = new byte[w * h * 4];
             for (int y = 0; y < h; y++)
