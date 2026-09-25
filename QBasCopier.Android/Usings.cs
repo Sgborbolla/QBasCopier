@@ -7,6 +7,7 @@ global using CheckBox = Avalonia.Controls.CheckBox;
 global using ComboBox = Avalonia.Controls.ComboBox;
 global using Image = Avalonia.Controls.Image;
 global using ListBox = Avalonia.Controls.ListBox;
+global using Orientation = Avalonia.Layout.Orientation;
 global using ProgressBar = Avalonia.Controls.ProgressBar;
 global using TextBox = Avalonia.Controls.TextBox;
 global using Window = Avalonia.Controls.Window;

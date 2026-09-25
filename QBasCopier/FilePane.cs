@@ -99,16 +99,17 @@ public sealed class FilePane : UserControl
         _lv.ItemTemplate = new FuncDataTemplate<PaneEntry>(BuildRow, _ => true);
         _lv.SelectionChanged += (s, e) => SelectionChanged?.Invoke();
         _lv.DoubleTapped += OnDouble;
-        _lv.DragOver += (s, e) =>
+        DragDrop.SetAllowDrop(_lv, true);
+        DragDrop.AddDragOverHandler(_lv, (s, e) =>
         {
             if (e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy;
-        };
-        _lv.Drop += (s, e) =>
+        });
+        DragDrop.AddDropHandler(_lv, (s, e) =>
         {
             if (!e.Data.Contains(DataFormats.Files)) return;
             var files = e.Data.GetFiles()?.Select(x => x.Path.LocalPath).ToArray();
             if (files != null && files.Length > 0) FilesDropped?.Invoke(files);
-        };
+        });
         _host = new Border { Background = BgDeep, BorderBrush = BrushesFrom("#1F3B8C"), BorderThickness = new Thickness(1), Padding = new Thickness(2), Child = _lv };
         Grid.SetRow(_host, 2);
         grid.Children.Add(_host);
@@ -121,7 +122,7 @@ public sealed class FilePane : UserControl
     {
         var grid = new Grid
         {
-            ColumnDefinitions = { new ColumnDefinition(28), new ColumnDefinition(GridLength.Star), new ColumnDefinition(90), new ColumnDefinition(130), new ColumnDefinition(110) }
+            ColumnDefinitions = { new ColumnDefinition(new GridLength(28)), new ColumnDefinition(GridLength.Star), new ColumnDefinition(new GridLength(90)), new ColumnDefinition(new GridLength(130)), new ColumnDefinition(new GridLength(110)) }
         };
         var glyph = new TextBlock { Text = e.IsDir ? "▸" : "", VerticalAlignment = VerticalAlignment.Center };
         glyph.Foreground = e.IsDir ? DirBrush : BrushesFrom("#3352A8");
@@ -153,14 +154,19 @@ public sealed class FilePane : UserControl
         return grid;
     }
 
-    private Button MkSm(string txt, Action act) => new()
+    private Button MkSm(string txt, Action act)
     {
-        Content = txt,
-        FontSize = 13,
-        Width = 34,
-        Padding = new Thickness(3, 2, 3, 2),
-        Margin = new Thickness(1)
-    }.Also(b => b.Click += (s, e) => act());
+        var b = new Button
+        {
+            Content = txt,
+            FontSize = 13,
+            Width = 34,
+            Padding = new Thickness(3, 2, 3, 2),
+            Margin = new Thickness(1)
+        };
+        b.Click += (s, e) => act();
+        return b;
+    }
 
     public void RefreshDrives()
     {
@@ -176,9 +182,9 @@ public sealed class FilePane : UserControl
                     Content = $"[{d.Name.TrimEnd('\\', '/')}]",
                     Margin = new Thickness(1),
                     Padding = new Thickness(6, 1, 6, 1),
-                    Foreground = d.DriveType == DriveType.Removable ? Gold : TextBlue,
-                    ToolTip = d.VolumeLabel.Length > 0 ? $"{d.Name} {d.VolumeLabel}" : d.Name
+                    Foreground = d.DriveType == DriveType.Removable ? Gold : TextBlue
                 };
+                ToolTip.SetTip(b, d.VolumeLabel.Length > 0 ? $"{d.Name} {d.VolumeLabel}" : d.Name);
                 var letter = d.Name;
                 b.Click += (s, e) =>
                 {

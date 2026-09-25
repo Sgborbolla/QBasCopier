@@ -304,15 +304,16 @@ public sealed class MainWindow : Window
         var bTo = Mk("…", () => PickDirInto(_tbTo));
         Grid.SetColumn(bTo, 2); toRow.Children.Add(bTo);
 
-        _lbQueue = new ListBox { SelectionMode = SelectionMode.Multiple, AllowDrop = true, MinHeight = 190 };
-        _lbQueue.ItemTemplate = new FuncDataTemplate<CopyItem>((it, _ns) => BuildQueueRow(it), _ => true);
-        _lbQueue.DragOver += (s, e) => { if (e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy; };
-        _lbQueue.Drop += (s, e) =>
+        _lbQueue = new ListBox { SelectionMode = SelectionMode.Multiple, MinHeight = 190 };
+        DragDrop.SetAllowDrop(_lbQueue, true);
+        DragDrop.AddDragOverHandler(_lbQueue, (s, e) => { if (e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy; });
+        DragDrop.AddDropHandler(_lbQueue, (s, e) =>
         {
             if (!e.Data.Contains(DataFormats.Files)) return;
             var fl = e.Data.GetFiles()?.Select(x => x.Path.LocalPath).ToArray();
             if (fl is { Length: > 0 }) AddFiles(fl);
-        };
+        });
+        _lbQueue.ItemTemplate = new FuncDataTemplate<CopyItem>((it, _ns) => BuildQueueRow(it), _ => true);
 
         var gl = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star) } };
         _lblProg = MkLbl("0%", 13);
@@ -358,7 +359,7 @@ public sealed class MainWindow : Window
 
     private static Control BuildQueueRow(CopyItem it)
     {
-        var grid = new Grid { ColumnDefinitions = { new(200), new(90), new(GridLength.Star), new(150), new(120) } };
+        var grid = new Grid { ColumnDefinitions = { new ColumnDefinition(new GridLength(200)), new ColumnDefinition(new GridLength(90)), new ColumnDefinition(GridLength.Star), new ColumnDefinition(new GridLength(150)), new ColumnDefinition(new GridLength(120)) } };
         var name = new TextBlock { TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center, FontWeight = it.IsDirectory ? FontWeight.SemiBold : FontWeight.Normal };
         name.Bind(TextBlock.TextProperty, new Binding("Name"));
         Grid.SetColumn(name, 0); grid.Children.Add(name);
@@ -534,7 +535,7 @@ public sealed class MainWindow : Window
 
         var checks = new StackPanel { Spacing = 4 };
         var chkTray = MkChk("", S.TrayIcon, b => { S.TrayIcon = b; S.Save(); BuildTray(); });
-        var chkStart = MkChk("", S.StartWithWindows, b => { S.StartWithWindows = b; S.Save(); if (OperatingSystem.IsWindows()) ExplorerIntegration.SetStartWithWindows(b); });
+        var chkStart = MkChk("", S.StartWithWindows, b => { S.StartWithWindows = b; S.Save(); if (!OperatingSystem.IsAndroid()) ApplyStartWithWindows(b); });
         var chkAttrib = MkChk("", S.CopyAttributes, b => { S.CopyAttributes = b; S.Save(); });
         var chkSec = MkChk("", S.CopySecurity, b => { S.CopySecurity = b; S.Save(); });
         var chkDel = MkChk("", S.DeleteUnfinished, b => { S.DeleteUnfinished = b; S.Save(); });
@@ -721,12 +722,19 @@ public sealed class MainWindow : Window
     private void RefreshIntegrationButton()
     {
         if (_bIntegrate == null) return;
+#if !ANDROID
         bool on = OperatingSystem.IsWindows() && ExplorerIntegration.IsInstalled;
+#else
+        bool on = false;
+#endif
         _bIntegrate.Content = on ? Ex.Get("unintegrate") : Ex.Get("integrate");
     }
 
     private void ToggleIntegration()
     {
+#if ANDROID
+        return;
+#else
         if (!OperatingSystem.IsWindows())
         {
             _lblStatus.Text = Ex.Get("integrate") + " (Linux/macOS)";
@@ -736,6 +744,14 @@ public sealed class MainWindow : Window
         else ExplorerIntegration.Install();
         RefreshIntegrationButton();
         _lblStatus.Text = L.Get("ok");
+#endif
+    }
+
+    private static void ApplyStartWithWindows(bool on)
+    {
+#if !ANDROID
+        if (OperatingSystem.IsWindows()) ExplorerIntegration.SetStartWithWindows(on);
+#endif
     }
 
     private void ToggleFold()
@@ -976,7 +992,7 @@ public sealed class MainWindow : Window
     {
         var done = _engine?.DoneBytes ?? 0;
         _engine = null;
-        await HistoryStore.AppendAsync(new List<HistoryEntry> { new() { Time = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"), Source = _tbFrom.Text ?? "", Dest = _tbTo.Text ?? "", Result = cancelled ? L.Get("histCancelled") : err > 0 ? L.Get("histErrors") : L.Get("histOk"), DoneBytes = done } });
+        await HistoryStore.AppendAsync(_tbFrom.Text ?? "", _tbTo.Text ?? "", cancelled ? L.Get("histCancelled") : err > 0 ? L.Get("histErrors") : L.Get("histOk"), done);
         RefreshHistory();
         if (S.AfterDone == "close" || (S.AfterDone == "keepIfErrors" && err == 0)) DoQuit();
         else BuildTray();
@@ -1069,10 +1085,11 @@ public sealed class MainWindow : Window
     // ----------------------------------------------------------- bandeja
     private void BuildTray()
     {
+#if !ANDROID
         try
         {
             if (_tray != null) { _tray.IsVisible = false; _tray.Dispose(); _tray = null; }
-            if (!S.TrayIcon || !TrayIcon.IsSupported || _logoBmp == null) return;
+            if (!S.TrayIcon || _logoBmp == null) return;
             _tray = new TrayIcon { Icon = new WindowIcon(_logoBmp), ToolTipText = "QBasCopier", IsVisible = true };
             _tray.Menu = new NativeMenu();
             var mOpen = new NativeMenuItem("QBasCopier");
@@ -1084,6 +1101,7 @@ public sealed class MainWindow : Window
             _tray.Menu.Items.Add(mQuit);
         }
         catch { }
+#endif
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
@@ -1099,7 +1117,12 @@ public sealed class MainWindow : Window
     }
 
     // ----------------------------------------------------------- util
-    private static Button Mk(string text, Action? act) => new() { Content = L.Get(text), FontSize = 12, Margin = new Thickness(2) }.Also(b => { if (act != null) b.Click += (s, e) => act(); });
+    private static Button Mk(string text, Action? act)
+    {
+        var b = new Button { Content = L.Get(text), FontSize = 12, Margin = new Thickness(2) };
+        if (act != null) b.Click += (s, e) => act();
+        return b;
+    }
 
     private static TextBlock MkLbl(string t, int size) => new() { Text = t, FontSize = size, Foreground = TextMain, VerticalAlignment = VerticalAlignment.Center };
 

@@ -53,6 +53,8 @@ public sealed class CopyItem : INotifyPropertyChanged
 
 public sealed class CopyEngine
 {
+    public CopyEngine(Settings s) => S = s;
+
     public Settings S { get; }
     public List<CopyItem> Items { get; } = new();
     public bool Move { get; set; }
@@ -525,6 +527,7 @@ public sealed class CopyEngine
         }
         catch { }
         if (!S.CopyAttributes) return;
+#if !ANDROID
         if (S.CopySecurity)
         {
             try
@@ -534,6 +537,7 @@ public sealed class CopyEngine
             }
             catch { }
         }
+#endif
         try
         {
             if (!it.IsDirectory)
