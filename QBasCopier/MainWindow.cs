@@ -156,9 +156,17 @@ public sealed partial class MainWindow : Window
         if (paths.Count > 0) AddFiles(paths.ToArray());
         if (!string.IsNullOrEmpty(dest)) _tbTo.Text = dest;
 
-        if (hidden && paths.Count == 0) { Hide(); return; }
+        if (hidden && paths.Count == 0)
+        {
+#if !ANDROID
+            Hide();
+#endif
+            return;
+        }
+#if !ANDROID
         Show();
         Activate();
+#endif
         if (paths.Count > 0 && !string.IsNullOrEmpty(dest)) _ = Task.Delay(120).ContinueWith(_ => Dispatcher.UIThread.Post(() => _ = StartCopy(move)));
     }
 
