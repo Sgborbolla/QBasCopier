@@ -5,6 +5,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using ZXing;
 using ZXing.Common;
+using ZXing.QrCode;
 
 namespace QBasCopier;
 

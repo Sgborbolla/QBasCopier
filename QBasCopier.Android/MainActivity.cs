@@ -129,8 +129,10 @@ public static class DroidList
             if (cr == null) return res;
             var pu = global::Android.Net.Uri.Parse(parentUri);
             if (pu == null) return res;
-            var childUri = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(pu, pu);
-            using var c = cr.Query(childUri, null, null, null, null);
+            var treeId = global::Android.Provider.DocumentsContract.GetTreeDocumentId(pu);
+            if (treeId == null) return res;
+            var kidsUri = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(pu, treeId);
+            using var c = cr.Query(kidsUri, null, null, null, null);
             if (c == null) return res;
             while (c.MoveToNext())
             {
