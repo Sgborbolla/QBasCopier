@@ -1,0 +1,145 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="QBasCopier.App"
+             RequestedThemeVariant="Dark">
+
+  <Application.Resources>
+
+    <!-- Paleta original QBasCopier (extraída del binario) -->
+    <SolidColorBrush x:Key="BgBase">#05091C</SolidColorBrush>
+    <SolidColorBrush x:Key="BgPanel">#060D24</SolidColorBrush>
+    <SolidColorBrush x:Key="BgDeep">#08122F</SolidColorBrush>
+    <SolidColorBrush x:Key="BgHeader">#0B1740</SolidColorBrush>
+    <SolidColorBrush x:Key="BgHover">#1A2C6E</SolidColorBrush>
+    <SolidColorBrush x:Key="Accent">#002A8F</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentMid">#12307D</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentLight">#2A7DE1</SolidColorBrush>
+    <SolidColorBrush x:Key="TextMain">#F6F8FF</SolidColorBrush>
+    <SolidColorBrush x:Key="TextSoft">#9FB3E8</SolidColorBrush>
+    <SolidColorBrush x:Key="TextBlue">#6FB1FC</SolidColorBrush>
+    <SolidColorBrush x:Key="Red">#CF142B</SolidColorBrush>
+    <SolidColorBrush x:Key="RedDark">#B01226</SolidColorBrush>
+    <SolidColorBrush x:Key="Gold">#FBBF24</SolidColorBrush>
+    <SolidColorBrush x:Key="Line">#1F3B8C</SolidColorBrush>
+    <SolidColorBrush x:Key="LineSoft">#3352A8</SolidColorBrush>
+    <SolidColorBrush x:Key="Water" Opacity="0.06">#6FB1FC</SolidColorBrush>
+
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="Window">
+      <Setter Property="Background" Value="{StaticResource BgBase}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+    </Style>
+
+    <Style Selector="Button">
+      <Setter Property="Background" Value="{StaticResource AccentMid}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource LineSoft}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="13,6"/>
+      <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button:pointerover">
+      <Setter Property="Background" Value="{StaticResource AccentLight}"/>
+    </Style>
+    <Style Selector="Button:pressed">
+      <Setter Property="Background" Value="{StaticResource Accent}"/>
+    </Style>
+    <Style Selector="Button:disabled">
+      <Setter Property="Opacity" Value="0.45"/>
+    </Style>
+
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource Red}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource RedDark}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover">
+      <Setter Property="Background" Value="#E04359"/>
+    </Style>
+
+    <Style Selector="Button.gold">
+      <Setter Property="Background" Value="{StaticResource Gold}"/>
+      <Setter Property="BorderBrush" Value="#D69E18"/>
+      <Setter Property="Foreground" Value="#05091C"/>
+    </Style>
+    <Style Selector="Button.gold:pointerover">
+      <Setter Property="Background" Value="#FFCE4D"/>
+    </Style>
+
+    <Style Selector="TextBox">
+      <Setter Property="Background" Value="{StaticResource BgDeep}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource LineSoft}"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="Padding" Value="8,5"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style Selector="TextBox:focus">
+      <Setter Property="BorderBrush" Value="{StaticResource Gold}"/>
+    </Style>
+
+    <Style Selector="ComboBox">
+      <Setter Property="Background" Value="{StaticResource BgPanel}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource LineSoft}"/>
+      <Setter Property="CornerRadius" Value="6"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style Selector="ComboBoxItem">
+      <Setter Property="Background" Value="{StaticResource BgPanel}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+    </Style>
+
+    <Style Selector="CheckBox">
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style Selector="ProgressBar">
+      <Setter Property="Foreground" Value="{StaticResource AccentLight}"/>
+      <Setter Property="Background" Value="{StaticResource BgDeep}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="4"/>
+      <Setter Property="Height" Value="14"/>
+    </Style>
+    <Style Selector="ProgressBar.blue">
+      <Setter Property="Foreground" Value="{StaticResource TextBlue}"/>
+    </Style>
+    <Style Selector="ProgressBar.green">
+      <Setter Property="Foreground" Value="#3FD68B"/>
+    </Style>
+
+    <Style Selector="ListBox">
+      <Setter Property="Background" Value="{StaticResource BgDeep}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="FontSize" Value="13"/>
+      <Setter Property="Padding" Value="4,2"/>
+    </Style>
+    <Style Selector="ListBoxItem:selected">
+      <Setter Property="Background" Value="{StaticResource Accent}"/>
+    </Style>
+    <Style Selector="ListBoxItem:pointerover">
+      <Setter Property="Background" Value="{StaticResource BgHover}"/>
+    </Style>
+
+    <Style Selector="Separator">
+      <Setter Property="Background" Value="{StaticResource Line}"/>
+      <Setter Property="Margin" Value="6,2"/>
+    </Style>
+
+  </Application.Styles>
+</Application>

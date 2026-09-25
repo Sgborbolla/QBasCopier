@@ -1,0 +1,2 @@
+El tema de QBasCopier se definió en App.axaml (Avalonia).
+Este archivo legacy de WPF se eliminó; la clase App vive en App.xaml.cs.

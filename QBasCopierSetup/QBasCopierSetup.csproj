@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>QBasCopierSetup</AssemblyName>
+    <RootNamespace>QBasCopierSetup</RootNamespace>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+    <Product>QBasCopier Setup</Product>
+    <Description>Instalador de QBasCopier con música de fondo.</Description>
+    <Copyright>© 2026 QBasCopier</Copyright>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Deterministic>true</Deterministic>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Generado por build.bat: publish portable del programa principal -->
+    <Resource Include="Assets\app.exe" />
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\music.mp3" />
+    <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,26 @@
+QBasCopier v1.0 — Créditos y licencias
+=======================================
+
+PROGRAMA
+  © QBasWinG (el creador). Todos los derechos reservados.
+  Este código es de uso personal del creador. No redistribuir sin permiso.
+
+MARCA Y LOGOTIPO
+  "QBasCopier", "QBasWinG" y el logotipo qbaswing son del creador (QBasWinG).
+  Marca de agua "QBasCopier © 2026" incluida en la interfaz.
+
+MÚSICA DEL INSTALADOR (Windows)
+  Pista: "Zoned / 2017 12 01 in C Major" — dominio público (FreePD).
+  Fuente: https://freepd.com/ (CC0 / dominio público). Sin atribución requerida.
+  Archivo: QBasCopierSetup/Assets/music.mp3
+
+INSPIRACIÓN
+  El comportamiento (colas, reproducción, límite de velocidad, reintentos…) está
+  inspirado en copiadores existentes, pero la implementación, interfaz, textos,
+  paleta y organización son originales de este proyecto. No incluye código de
+  SuperCopier ni de terceros.
+
+TERCEROS (paquetes NuGet)
+  - Avalonia UI 11.3.5 (MIT) — https://github.com/AvaloniaUI/Avalonia
+  - Avalonia.Themes.Fluent (MIT)
+  - .NET 10 / .NET Runtime (MIT) — Microsoft

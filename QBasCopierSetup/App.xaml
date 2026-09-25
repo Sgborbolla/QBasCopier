@@ -1,0 +1,73 @@
+<Application x:Class="QBasCopierSetup.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Startup="OnStartup">
+    <Application.Resources>
+        <SolidColorBrush x:Key="BgBase">#05091C</SolidColorBrush>
+        <SolidColorBrush x:Key="BgPanel">#060D24</SolidColorBrush>
+        <SolidColorBrush x:Key="BgDeep">#08122F</SolidColorBrush>
+        <SolidColorBrush x:Key="BgHeader">#0B1740</SolidColorBrush>
+        <SolidColorBrush x:Key="BgHover">#1A2C6E</SolidColorBrush>
+        <SolidColorBrush x:Key="Accent">#002A8F</SolidColorBrush>
+        <SolidColorBrush x:Key="AccentMid">#12307D</SolidColorBrush>
+        <SolidColorBrush x:Key="AccentLight">#2A7DE1</SolidColorBrush>
+        <SolidColorBrush x:Key="TextMain">#F6F8FF</SolidColorBrush>
+        <SolidColorBrush x:Key="TextSoft">#9FB3E8</SolidColorBrush>
+        <SolidColorBrush x:Key="TextBlue">#6FB1FC</SolidColorBrush>
+        <SolidColorBrush x:Key="Red">#CF142B</SolidColorBrush>
+        <SolidColorBrush x:Key="RedDark">#B01226</SolidColorBrush>
+        <SolidColorBrush x:Key="Gold">#FBBF24</SolidColorBrush>
+        <SolidColorBrush x:Key="Line">#1F3B8C</SolidColorBrush>
+
+        <Style x:Key="SetupButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentMid}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{StaticResource AccentLight}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SetupPrimary" TargetType="Button" BasedOn="{StaticResource SetupButton}">
+            <Setter Property="Background" Value="{StaticResource Red}"/>
+            <Setter Property="FontSize" Value="16"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource BgDeep}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+
+        <Style x:Key="SetupBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Margin" Value="0,4"/>
+        </Style>
+    </Application.Resources>
+</Application>
