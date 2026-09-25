@@ -40,7 +40,7 @@ public sealed class FilePane : UserControl
     private static SolidColorBrush BrushesFrom(string hex) => new(Color.Parse(hex));
 
     private readonly StackPanel _driveBar = new() { Orientation = Orientation.Horizontal };
-    private readonly ListBox _lv = new() { AllowDrop = true };
+    private readonly ListBox _lv = new();
     private readonly TextBox _pathTb = new();
     private readonly List<PaneEntry> _entries = new();
     private readonly List<string> _back = new(), _fwd = new();
@@ -96,20 +96,20 @@ public sealed class FilePane : UserControl
         grid.Children.Add(nav);
 
         _lv.ItemsPanel = new FuncTemplate<Panel>(() => new StackPanel());
-        _lv.ItemTemplate = new FuncDataTemplate<PaneEntry>(BuildRow, _ => true);
+        _lv.ItemTemplate = new FuncDataTemplate<PaneEntry>(BuildRow);
         _lv.SelectionChanged += (s, e) => SelectionChanged?.Invoke();
         _lv.DoubleTapped += OnDouble;
         DragDrop.SetAllowDrop(_lv, true);
-        DragDrop.AddDragOverHandler(_lv, (s, e) =>
+        _lv.AddHandler(DragDrop.DragOverEvent, (EventHandler<DragEventArgs>)((s, e) =>
         {
             if (e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy;
-        });
-        DragDrop.AddDropHandler(_lv, (s, e) =>
+        }));
+        _lv.AddHandler(DragDrop.DropEvent, (EventHandler<DragEventArgs>)((s, e) =>
         {
             if (!e.Data.Contains(DataFormats.Files)) return;
             var files = e.Data.GetFiles()?.Select(x => x.Path.LocalPath).ToArray();
             if (files != null && files.Length > 0) FilesDropped?.Invoke(files);
-        });
+        }));
         _host = new Border { Background = BgDeep, BorderBrush = BrushesFrom("#1F3B8C"), BorderThickness = new Thickness(1), Padding = new Thickness(2), Child = _lv };
         Grid.SetRow(_host, 2);
         grid.Children.Add(_host);

@@ -124,14 +124,20 @@ public sealed class MainWindow : Window
                 case "--lang" when i + 1 < args.Length:
                     S.Lang = Code(args[++i]); L.SetLanguage(S.Lang); break;
                 case "--install-integration":
+#if !ANDROID
                     if (OperatingSystem.IsWindows()) ExplorerIntegration.Install();
+#endif
                     break;
                 case "--uninstall-integration":
+#if !ANDROID
                     if (OperatingSystem.IsWindows()) ExplorerIntegration.Uninstall();
+#endif
                     break;
                 case "--start-with-windows":
                     S.StartWithWindows = true;
+#if !ANDROID
                     if (OperatingSystem.IsWindows()) ExplorerIntegration.SetStartWithWindows(true);
+#endif
                     break;
                 case "--move": move = true; break;
                 case "--copy": after = true; break;
@@ -198,7 +204,7 @@ public sealed class MainWindow : Window
         var bar = new Grid
         {
             ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) },
-            Padding = new Thickness(8, 4)
+            Margin = new Thickness(8, 4)
         };
         var brand = new TextBlock { Text = "QBasCopier", FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0) };
         Grid.SetColumn(brand, 0);
@@ -306,14 +312,14 @@ public sealed class MainWindow : Window
 
         _lbQueue = new ListBox { SelectionMode = SelectionMode.Multiple, MinHeight = 190 };
         DragDrop.SetAllowDrop(_lbQueue, true);
-        DragDrop.AddDragOverHandler(_lbQueue, (s, e) => { if (e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy; });
-        DragDrop.AddDropHandler(_lbQueue, (s, e) =>
+        _lbQueue.AddHandler(DragDrop.DragOverEvent, (EventHandler<DragEventArgs>)((s, e) => { if (e.Data.Contains(DataFormats.Files)) e.DragEffects = DragDropEffects.Copy; }));
+        _lbQueue.AddHandler(DragDrop.DropEvent, (EventHandler<DragEventArgs>)((s, e) =>
         {
             if (!e.Data.Contains(DataFormats.Files)) return;
             var fl = e.Data.GetFiles()?.Select(x => x.Path.LocalPath).ToArray();
             if (fl is { Length: > 0 }) AddFiles(fl);
-        });
-        _lbQueue.ItemTemplate = new FuncDataTemplate<CopyItem>((it, _ns) => BuildQueueRow(it), _ => true);
+        }));
+        _lbQueue.ItemTemplate = new FuncDataTemplate<CopyItem>((it, _ns) => BuildQueueRow(it));
 
         var gl = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star) } };
         _lblProg = MkLbl("0%", 13);
@@ -382,7 +388,7 @@ public sealed class MainWindow : Window
     {
         var panel = new StackPanel { Spacing = 6 };
         _lbErrs = new ListBox { MinHeight = 240 };
-        _lbErrs.ItemTemplate = new FuncDataTemplate<string>((s, _ns) => new TextBlock { Text = s, TextWrapping = TextWrapping.Wrap, Foreground = TextSoft }, _ => true);
+        _lbErrs.ItemTemplate = new FuncDataTemplate<string>((s, _ns) => new TextBlock { Text = s, TextWrapping = TextWrapping.Wrap, Foreground = TextSoft });
         panel.Children.Add(_lbErrs);
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var bClr = Mk("clear", () => { _errLines.Clear(); _lbErrs.ItemsSource = null; });
@@ -599,7 +605,7 @@ public sealed class MainWindow : Window
             tp.Children.Add(MkLbl(FilePane.Human(h.DoneBytes), 12).Tint(TextSoft));
             tp.Children.Add(new Border { Background = Line, Height = 1, Margin = new Thickness(0, 2, 0, 0) });
             return tp;
-        }, _ => true);
+        });
         panel.Children.Add(_lbHist);
         var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var bClr = Mk("histClear", async () => { await HistoryStore.ClearAsync(); RefreshHistory(); });

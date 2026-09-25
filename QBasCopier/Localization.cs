@@ -13,6 +13,11 @@ public static class L
 
     public static string lang = "es";
 
+    public static int Current
+    {
+        get { int i = Array.IndexOf(Codes, lang); return i < 0 ? 0 : i; }
+    }
+
     public static string Get(string key)
     {
         if (!R.TryGetValue(key, out var a)) return key;

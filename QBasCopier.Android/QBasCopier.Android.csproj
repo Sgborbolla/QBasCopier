@@ -25,5 +25,7 @@
   <ItemGroup>
     <Compile Include="../QBasCopier/*.cs" Exclude="../QBasCopier/ExplorerIntegration.cs" />
     <AvaloniaResource Include="../QBasCopier/Assets/*.png" />
+    <AvaloniaXaml Include="../QBasCopier/App.axaml" Link="App.axaml" />
+    <AvaloniaXaml Include="../QBasCopier/MainWindow.axaml" Link="MainWindow.axaml" />
   </ItemGroup>
 </Project>
