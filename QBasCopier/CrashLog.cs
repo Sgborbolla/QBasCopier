@@ -44,7 +44,7 @@ public static class CrashLog
         catch { }
     }
 
-    private static void Save(string msg)
+    public static void Save(string msg)
     {
         try
         {
