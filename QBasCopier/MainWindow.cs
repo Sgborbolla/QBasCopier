@@ -65,6 +65,13 @@ public sealed partial class MainWindow : Window
     private CheckBox _chkTray = null!, _chkStart = null!, _chkAttrib = null!, _chkSec = null!, _chkDel = null!, _chkKeep = null!, _chkRO = null!, _chkHidden = null!, _chkTitle = null!, _chkLimit = null!, _chkVerify = null!, _chkActivate = null!, _chkAskAdd = null!, _chkLog = null!;
 
     private const string TabExplorer = "explorer", TabQueue = "queue", TabErrors = "errors", TabOptions = "options", TabHistory = "history";
+    private const string AboutText =
+        "QBasCopier crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
+        "que nació de las manos del Dr. Sergio Grabiel Borbolla Verdecia. Desde Cuba, con el corazón " +
+        "lleno de amor por la medicina y por el mundo digital, cada línea se escribe con esfuerzo y " +
+        "esperanza, aunque a veces la tecnología no alcance. Este es un pequeño homenaje a la idea de " +
+        "que con dedicación se cumplen sueños y se entregan al mundo obras útiles y hermosas. " +
+        "Gracias por formar parte de él.\n\n— SBV";
 
     public MainWindow()
     {
@@ -595,6 +602,25 @@ public sealed partial class MainWindow : Window
         bottom.Children.Add(bDef);
 
         col.Children.Add(bottom);
+
+        var about = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
+        var aboutT = MkLbl("Acerca de QBasCopier", 13);
+        aboutT.FontWeight = FontWeight.Bold;
+        aboutT.Foreground = Gold;
+        about.Children.Add(aboutT);
+        try
+        {
+            using var s = AssetLoader.Open(new Uri("avares://QBasCopier/Assets/logo.png"));
+            about.Children.Add(new Image { Source = new Bitmap(s), Width = 96, Height = 96, Stretch = Stretch.Uniform, Margin = new Thickness(0, 2, 0, 0) });
+        }
+        catch { }
+        var aboutBody = MkLbl(AboutText, 12);
+        aboutBody.TextWrapping = TextWrapping.Wrap;
+        aboutBody.MaxWidth = 460;
+        aboutBody.Tint(TextSoft);
+        about.Children.Add(aboutBody);
+        col.Children.Add(about);
+
         Grid.SetColumn(col, 0);
         g.Children.Add(col);
         Grid.SetColumn(checks, 1);
