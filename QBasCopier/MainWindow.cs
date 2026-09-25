@@ -71,7 +71,7 @@ public sealed partial class MainWindow : Window
         "lleno de amor por la medicina y por el mundo digital, cada línea se escribe con esfuerzo y " +
         "esperanza, aunque a veces la tecnología no alcance. Este es un pequeño homenaje a la idea de " +
         "que con dedicación se cumplen sueños y se entregan al mundo obras útiles y hermosas. " +
-        "Gracias por formar parte de él.\n\n— SBV";
+        "Gracias por formar parte de él.\n\n— SGBV";
 
     public MainWindow()
     {
