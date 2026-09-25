@@ -64,14 +64,510 @@ public sealed partial class MainWindow : Window
     private TextBlock _lblThreads = null!, _lblSpeed = null!;
     private CheckBox _chkTray = null!, _chkStart = null!, _chkAttrib = null!, _chkSec = null!, _chkDel = null!, _chkKeep = null!, _chkRO = null!, _chkHidden = null!, _chkTitle = null!, _chkLimit = null!, _chkVerify = null!, _chkActivate = null!, _chkAskAdd = null!, _chkLog = null!;
 
-    private const string TabExplorer = "explorer", TabQueue = "queue", TabErrors = "errors", TabOptions = "options", TabHistory = "history";
+    private const string TabExplorer = "explorer", TabQueue = "queue", TabErrors = "errors", TabOptions = "options", TabHistory = "history", TabTransfer = "transfer";
     private const string AboutText =
         "QBasCopier&Transfer crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
         "que nació de las manos del Dr. Sergio Grabiel Borbolla Verdecia. Desde Cuba, con el corazón " +
         "lleno de amor por la medicina y por el mundo digital, cada línea se escribe con esfuerzo y " +
-        "esperanza, aunque a veces la tecnología no alcance. Este es un pequeño homenaje a la idea de " +
-        "que con dedicación se cumplen sueños y se entregan al mundo obras útiles y hermosas. " +
-        "Gracias por formar parte de él.\n\n— SGBV";
+        "esperanza, aunque a veces la tecnología no alcance.\n\n" +
+        "En este camino no estoy solo, y quiero que lo sepas: una parte muy especial de esta obra " +
+        "pertenece también a Frank Freeman, dueño de Freeman y Diseño —más conocido como Freeman " +
+        "Impresiones—, a quien considero no solo un amigo, sino casi un hermano. Él cree en mí y en " +
+        "este proyecto, me apoya y me ayuda en cada paso, y esa fe sincera es uno de los motores que " +
+        "sostienen cada línea de este código.\n\n" +
+        "Este es un pequeño homenaje a la idea de que con dedicación se cumplen sueños y se entregan " +
+        "al mundo obras útiles y hermosas. Gracias por formar parte de él.\n\n— SGBV";
+
+    // ---------------------- Transferir (QBasCopier&Transfer) ----------------------
+    private readonly TransferHost _trSrv = new();
+    private CheckBox? _trToggle;
+    private Image? _trImg;
+    private Image? _trNetImg;
+    private TextBlock? _trNetInfo;
+    private Border? _trNetBox;
+    private TextBlock? _trInfo;
+    private TextBlock? _trStatus;
+    private TextBlock? _trRx;
+    private TextBox? _trAddr;
+    private ListBox? _trPeers;
+    private readonly System.Collections.Generic.List<string> _trPeerList = new();
+    private long _trRxBytes;
+    private long _trLastFill;
+
+    private string DevName => (S.DeviceName?.Trim() ?? "") is { Length: > 0 } n ? n : (OperatingSystem.IsAndroid() ? "Android" : Environment.MachineName);
+
+    private static void DispatchUi(Action a) { try { Dispatcher.UIThread.Post(a); } catch { } }
+
+    private void InitTransfer()
+    {
+        TransferHost.DeviceName = DevName;
+        _trSrv.FileReceived += (path, bytes) =>
+        {
+            var name = System.IO.Path.GetFileName(path);
+#if ANDROID
+            var saved = path;
+            _ = Task.Run(() => QBasCopier.Android.DroidPub.Publish(saved));
+#endif
+            _ = Task.Run(async () =>
+            {
+                try { await HistoryStore.AppendAsync(DeviceNameOrHost(), "Transferir (WiFi)", "Recibido: " + name + " (" + FilePane.Human(bytes) + ")", bytes); }
+                catch { }
+            });
+            DispatchUi(() =>
+            {
+                _trRxBytes += bytes;
+                _lblStatus.Text = "Recibido: " + name + " (" + FilePane.Human(bytes) + ")";
+                if (_trStatus != null) _trStatus.Text = "Recibido: " + name;
+#if ANDROID
+                if (S.TransferAuto) QBasCopier.Android.DroidCtx.Toast("Recibido: " + name);
+#endif
+            });
+        };
+        Discovery.Changed += () => DispatchUi(FillPeers);
+    }
+
+    private static string DeviceNameOrHost()
+    {
+        try { return (string.IsNullOrWhiteSpace(TransferHost.DeviceName) ? Environment.MachineName : TransferHost.DeviceName); }
+        catch { return "QBasCopier"; }
+    }
+
+    private void ToggleTr(bool on)
+    {
+        S.TransferOn = on; S.Save();
+        if (on)
+        {
+            var inbox = S.TransferInbox;
+            if (string.IsNullOrWhiteSpace(inbox)) inbox = TransferDefaultInbox();
+            S.TransferInbox = inbox;
+            try { Directory.CreateDirectory(inbox); } catch { }
+            _trSrv.Start(S.TransferPort, inbox);
+            Discovery.Start(DevName, S.TransferPort);
+            _lblStatus.Text = "Modo Transferir activado. Muestra el QR o busca dispositivos.";
+#if ANDROID
+            QBasCopier.Android.MainActivity.Current?.OpenHotspotSettings();
+#endif
+        }
+        else
+        {
+            _trSrv.Stop();
+            Discovery.Stop();
+            _trPeerList.Clear();
+            FillPeers();
+            _lblStatus.Text = "Modo Transferir apagado.";
+        }
+        RefreshTrUi();
+    }
+
+    private static string TransferDefaultInbox()
+    {
+        try
+        {
+            if (OperatingSystem.IsAndroid())
+                return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Recibidos");
+            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "QBasCopierRecibidos");
+        }
+        catch { return System.IO.Path.GetTempPath(); }
+    }
+
+    private Control BuildTransferBody()
+    {
+        InitTransfer();
+        var sp = new StackPanel { Spacing = 10, Margin = new Thickness(6) };
+
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        _trToggle = MkChk("Modo Transferir (compartir por WiFi)", S.TransferOn, b => ToggleTr(b));
+        head.Children.Add(_trToggle);
+        head.Children.Add(Btn("Crear nuestra red", OpenHotspot));
+        head.Children.Add(Btn("Escanear QR", ScanQr));
+        head.Children.Add(Btn("Buscar dispositivos", () => { Discovery.Announce(); FillPeers(); _lblStatus.Text = "Buscando dispositivos…"; }));
+        sp.Children.Add(head);
+
+        var cfg = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var nmLb = MkLbl("Mi nombre:", 12); nmLb.Tint(TextSoft);
+        cfg.Children.Add(nmLb);
+        var tbName = new TextBox { Text = S.DeviceName ?? "", Width = 180, Watermark = "android · PC · tablet" };
+        tbName.TextChanged += (s, e) => { S.DeviceName = tbName?.Text ?? ""; S.Save(); };
+        cfg.Children.Add(tbName);
+        cfg.Children.Add(Btn("Carpeta de recibidos…", PickInbox));
+        var chkAuto = MkChk("Avisar al recibir", S.TransferAuto, b => { S.TransferAuto = b; S.Save(); });
+        cfg.Children.Add(chkAuto);
+        sp.Children.Add(cfg);
+
+        var row = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
+        var leftCol = new StackPanel { Spacing = 8, VerticalAlignment = VerticalAlignment.Top };
+        var qrPanel = new Border { Background = Brushes.White, CornerRadius = new CornerRadius(8), Padding = new Thickness(8), HorizontalAlignment = HorizontalAlignment.Left };
+        _trImg = new Image { Width = 320, Height = 320, Stretch = Stretch.Uniform };
+        qrPanel.Child = _trImg;
+        leftCol.Children.Add(qrPanel);
+
+        _trNetImg = new Image { Width = 200, Height = 200, Stretch = Stretch.Uniform };
+        _trNetInfo = MkLbl("", 12); _trNetInfo.Tint(TextSoft); _trNetInfo.TextWrapping = TextWrapping.Wrap;
+        _trNetInfo.MaxWidth = 320;
+        _trNetBox = new Border
+        {
+            Background = Brushes.White,
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            IsVisible = false,
+            Child = new StackPanel
+            {
+                Spacing = 6,
+                Children =
+                {
+                    new TextBlock { Text = "QR de nuestra red", FontSize = 13, FontWeight = FontWeight.Bold, Foreground = Brushes.Black },
+                    _trNetImg,
+                    _trNetInfo
+                }
+            }
+        };
+        leftCol.Children.Add(_trNetBox);
+        Grid.SetColumn(leftCol, 0);
+        row.Children.Add(leftCol);
+
+        var col = new StackPanel { Spacing = 8, Margin = new Thickness(12, 0, 0, 0) };
+        _trInfo = MkLbl("", 13); _trInfo.TextWrapping = TextWrapping.Wrap; _trInfo.MaxWidth = 430;
+        col.Children.Add(_trInfo);
+        _trStatus = MkLbl("", 12); _trStatus.Tint(TextSoft); _trStatus.TextWrapping = TextWrapping.Wrap;
+        col.Children.Add(_trStatus);
+        _trRx = MkLbl("", 12); _trRx.Tint(TextSoft);
+        col.Children.Add(_trRx);
+        col.Children.Add(MkLbl("O conéctate manualmente escribiendo la dirección:", 12).Tint(TextSoft));
+
+        var mr = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        _trAddr = new TextBox { Width = 250, Watermark = "http://IP:9527" };
+        mr.Children.Add(_trAddr);
+        mr.Children.Add(Btn("Conectar", ConnectManual));
+        col.Children.Add(mr);
+
+        col.Children.Add(MkLbl("Dispositivos encontrados (toca uno y pulsa Enviar):", 12).Tint(TextSoft));
+        _trPeers = new ListBox { MinHeight = 120, MaxHeight = 190 };
+        _trPeers.ItemsSource = _trPeerList;
+        col.Children.Add(_trPeers);
+        col.Children.Add(Btn("Enviar archivos al seleccionado…", PickAndSend));
+        col.Children.Add(MkLbl("Sin la app en el otro equipo? Abre esa misma dirección en el navegador: " +
+            "sube y descarga archivos (compatible con cualquier móvil, tablet u ordenador).", 12).Tint(TextSoft));
+        col.Children.Add(MkLbl("Para transferir más rápido: 5 GHz, canal de 80 MHz y sin internet " +
+            "compartido a la vez por el mismo móvil.", 12).Tint(TextSoft));
+
+        Grid.SetColumn(col, 1);
+        row.Children.Add(col);
+        sp.Children.Add(row);
+
+        RefreshTrUi();
+        return sp;
+    }
+
+    private static Button Btn(string txt, Action a)
+    {
+        var b = new Button { Content = txt, FontSize = 12, Margin = new Thickness(2) };
+        b.Click += (s, e) => a();
+        return b;
+    }
+
+    private void RefreshTrUi()
+    {
+        if (_trInfo == null || _trImg == null) return;
+        var on = _trSrv.Running;
+        if (on)
+        {
+            var urls = new System.Collections.Generic.List<string>();
+            foreach (var p in _trSrv.Prefixes) if (!p.Contains("127.0.0.1")) urls.Add(p.TrimEnd('/'));
+            _trInfo.Text = "Red: " + S.TransferNet + Environment.NewLine +
+                           "Clave: " + S.TransferKey + Environment.NewLine +
+                           "Servidor activo en:" + Environment.NewLine +
+                           string.Join(Environment.NewLine, urls);
+            _trImg.Source = Qr.Make(MakeQrText(), 512);
+            _trStatus.Text = "Activo. Listo para recibir en: " + S.TransferInbox;
+            FillPeers();
+        }
+        else
+        {
+            _trInfo.Text = "Activa el modo Transferir para compartir archivos sin internet, entre móvil y PC por WiFi.";
+            _trImg.Source = null;
+            _trStatus.Text = "Modo apagado.";
+        }
+    }
+
+    private string MakeQrText()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("QBasCopier&Transfer");
+        sb.AppendLine("Red: " + S.TransferNet);
+        sb.AppendLine("Clave: " + S.TransferKey);
+        sb.AppendLine("WIFI:T:WPA;S:" + S.TransferNet + ";P:" + S.TransferKey + ";;");
+        foreach (var p in _trSrv.Prefixes) if (!p.Contains("127.0.0.1")) sb.AppendLine(p);
+        return sb.ToString();
+    }
+
+    private void PickAndSend()
+    {
+        var peer = _trPeers?.SelectedItem as string;
+        if (!_trSrv.Running) { _lblStatus.Text = "Activa el modo Transferir primero."; return; }
+        if (string.IsNullOrEmpty(peer)) { _lblStatus.Text = "Selecciona un dispositivo de la lista."; return; }
+        var sp = peer.IndexOf(' ');
+        if (sp <= 0) { _lblStatus.Text = "Dispositivo no válido."; return; }
+        var addr = peer.Substring(0, sp);          // "ip:puerto"
+        var colon = addr.LastIndexOf(':');
+        var host = colon > 0 ? addr.Substring(0, colon) : addr;
+        var port = colon > 0 && int.TryParse(addr.Substring(colon + 1), out var pp) ? pp : S.TransferPort;
+        var baseUrl = "http://" + host + ":" + port + "/";
+        PickFilesAndSend(baseUrl);
+    }
+
+    private void PickInbox()
+    {
+#if ANDROID
+        var ma = QBasCopier.Android.MainActivity.Current;
+        if (ma == null) return;
+        ma.PickTree(uri =>
+        {
+            if (string.IsNullOrEmpty(uri)) return;
+            S.TransferInbox = uri;
+            S.Save();
+            RestartTrServer();
+            RefreshTrUi();
+            _lblStatus.Text = "Inbox configurado (carpeta del sistema).";
+        });
+#else
+        _ = PickInboxDesktopAsync();
+#endif
+    }
+
+    private void RestartTrServer()
+    {
+        try
+        {
+            if (_trSrv.Running)
+            {
+                _trSrv.Stop();
+                _trSrv.Start(S.TransferPort, S.TransferInbox);
+            }
+        }
+        catch { }
+    }
+
+    private async Task PickInboxDesktopAsync()
+    {
+        try
+        {
+            var d = new OpenFolderDialog { Title = "Carpeta de recibidos…" };
+            var r = await d.ShowAsync(this);
+            if (!string.IsNullOrEmpty(r))
+            {
+                S.TransferInbox = r;
+                S.Save();
+                RestartTrServer();
+                RefreshTrUi();
+                _lblStatus.Text = "Inbox: " + r;
+            }
+        }
+        catch { }
+    }
+
+    private void ScanQr()
+    {
+#if ANDROID
+        QBasCopier.Android.ScanActivity.Callback = OnScanned;
+        QBasCopier.Android.MainActivity.Current?.StartScan();
+#else
+        _lblStatus.Text = "En PC escribe la dirección manualmente (debajo del QR en el otro equipo).";
+#endif
+    }
+
+    private async void PickFilesAndSend(string baseUrl)
+    {
+#if ANDROID
+        QBasCopier.Android.MainActivity.Current?.PickFiles(async uris =>
+        {
+            var names = new string[uris.Length];
+            for (int i = 0; i < uris.Length; i++)
+            {
+                var f = QBasCopier.Android.DroidFile.Info(uris[i]);
+                names[i] = "droid:" + uris[i] + "|" + f.Name + "|" + f.Size;
+            }
+            await SendToBaseUrlAsync(baseUrl, names);
+        });
+#else
+        try
+        {
+            var dlg = new OpenFileDialog { AllowMultiple = true, Title = "Enviar archivos…" };
+            var r = await dlg.ShowAsync(this);
+            if (r != null) await SendToBaseUrlAsync(baseUrl, r);
+        }
+        catch { }
+#endif
+    }
+
+    private async Task SendToBaseUrlAsync(string baseUrl, string[] paths)
+    {
+        if (paths == null || paths.Length == 0) return;
+        int sent = 0;
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrEmpty(path)) continue;
+            string name; long total; Func<Stream> open;
+            if (path.StartsWith("droid:"))
+            {
+#if ANDROID
+                var parts = path.Substring(6).Split('|');
+                var u = parts[0]; name = parts[1]; total = long.TryParse(parts[2], out var sz) ? sz : 0;
+                var uri = u;
+                open = () => QBasCopier.Android.DroidFile.Open(uri);
+                if (total <= 0)
+                {
+                    DispatchUi(() => _lblStatus.Text = "Tamaño desconocido; se omite " + name);
+                    continue;
+                }
+#else
+                DispatchUi(() => _lblStatus.Text = "Origen no disponible en este equipo.");
+                continue;
+#endif
+            }
+            else
+            {
+                var fi = new FileInfo(path);
+                if (!fi.Exists)
+                {
+                    DispatchUi(() => _lblStatus.Text = "No existe: " + path);
+                    continue;
+                }
+                name = fi.Name; total = fi.Length;
+                open = () => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 256 * 1024, FileOptions.Asynchronous);
+            }
+            var label = name;
+            long lastPost = 0;
+            var ok = await TransferClient.Upload(baseUrl, name, total, open, done =>
+            {
+                var now = Environment.TickCount64;
+                if (now - lastPost < 150) return;
+                lastPost = now;
+                DispatchUi(() => { if (_trStatus != null) _trStatus.Text = "Enviando " + label + ": " + FilePane.Human(done) + (total > 0 ? "/" + FilePane.Human(total) : ""); });
+            });
+            DispatchUi(() => _lblStatus.Text = (ok >= 0 ? "Enviado: " : "Error en: ") + label);
+            if (ok >= 0)
+            {
+                sent++;
+                try { await HistoryStore.AppendAsync(label, baseUrl, "Enviado por WiFi (" + FilePane.Human(total) + ")", total); } catch { }
+            }
+        }
+        if (_trRx != null) _trRx.Text = "Enviados en sesión: " + sent + " archivo(s)";
+    }
+
+    private void OnScanned(string txt)
+    {
+        if (string.IsNullOrWhiteSpace(txt)) { _lblStatus.Text = "QR vacío."; return; }
+        var url = "";
+        foreach (var line in txt.Split('\n'))
+            if (line.Trim().StartsWith("http", StringComparison.OrdinalIgnoreCase)) { url = line.Trim(); break; }
+        if (url.Length == 0) { _lblStatus.Text = "QR no válido para QBasCopier&Transfer."; return; }
+        ConnectBase(url.TrimEnd('/') + "/");
+    }
+
+    private void ConnectManual()
+    {
+        var t = (_trAddr?.Text ?? "").Trim();
+        if (t.Length == 0) { _lblStatus.Text = "Escribe una dirección, p. ej. http://192.168.1.5:9527"; return; }
+        if (!t.StartsWith("http", StringComparison.OrdinalIgnoreCase)) t = "http://" + t;
+        ConnectBase(t.TrimEnd('/') + "/");
+    }
+
+    private void ConnectBase(string baseUrl)
+    {
+        _ = Task.Run(async () =>
+        {
+            string txt;
+            try { txt = await TransferClient.Ping(baseUrl); }
+            catch { txt = ""; }
+            DispatchUi(() =>
+            {
+                if (txt.Contains("QBasCopier&Transfer"))
+                {
+                    _lblStatus.Text = "Conectado a: " + baseUrl;
+                    if (_trStatus != null) _trStatus.Text = "Conectado a: " + baseUrl;
+                }
+                else _lblStatus.Text = "No responde en " + baseUrl;
+            });
+        });
+    }
+
+    private void OpenHotspot()
+    {
+        var ssid = (S.TransferNet ?? "").Trim().Replace("\"", "").Replace(";", "");
+        if (ssid.Length == 0) ssid = "QBasWing-Transfer";
+        var key = (S.TransferKey ?? "").Trim();
+        if (key.Length < 8) key = "QBas2026";
+        S.TransferNet = ssid; S.TransferKey = key; S.Save();
+
+        ShowNetQr(ssid, key, "Red: " + ssid);
+#if ANDROID
+        var ma = QBasCopier.Android.MainActivity.Current;
+        if (ma == null) { _lblStatus.Text = "Abre la app y vuelve a pulsar Crear nuestra red."; return; }
+        _lblStatus.Text = "Abriendo los ajustes de WiFi…";
+        ma.StartOwnNetwork(ssid, key, (ok, msg) => DispatchUi(() =>
+        {
+            if (ok)
+            {
+                ShowNetQr(ssid, key, "Red: " + ssid);
+                if (_trStatus != null) _trStatus.Text = "1) En los ajustes, activa 'Punto de acceso' con el nombre " + ssid +
+                    " y la clave " + key + "  2) En el otro equipo entra a esa red  3) Abre la dirección de la app " +
+                    "en el navegador o pulsa Buscar dispositivos.";
+                _lblStatus.Text = "Red propia con estos datos: " + ssid + " / " + key;
+            }
+            else
+            {
+                if (_trStatus != null) _trStatus.Text = "No se pudo crear la red automáticamente (" + msg + "). " +
+                    "Abre los ajustes de punto de acceso y ponle el nombre " + ssid + " y la clave " + key + ".";
+                _lblStatus.Text = "Crea la red a mano con estos datos: " + ssid + " / " + key;
+                ma.OpenHotspotSettings();
+            }
+        }));
+#else
+        _lblStatus.Text = "Red propia: " + ssid + " · clave " + key;
+        if (_trStatus != null) _trStatus.Text = "En el PC: activa el punto de acceso móvil de Windows (o comparte esta red) y " +
+                                              "conecta el otro equipo. Luego pulsa Buscar dispositivos.";
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = OperatingSystem.IsWindows() ? "ms-settings:mobilehotspot" : "open",
+                UseShellExecute = true
+            };
+            if (!OperatingSystem.IsWindows())
+            {
+                psi.ArgumentList.Add("x-apple.systempreferences:com.apple.Network-Settings");
+            }
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch { }
+#endif
+    }
+
+    private void ShowNetQr(string ssid, string key, string title)
+    {
+        if (_trNetImg == null || _trNetInfo == null) return;
+        var payload = "WIFI:T:WPA;S:" + ssid + ";P:" + key + ";;\n\n" + ssid + "\nClave: " + key;
+        _trNetImg.Source = Qr.Make(payload, 420);
+        _trNetInfo.Text = title + "\nRed: " + ssid + "\nClave: " + key +
+                          "\nEn el otro equipo: entra a esa red y luego pulsa Buscar dispositivos.";
+        if (_trNetBox != null) _trNetBox.IsVisible = true;
+    }
+
+    private void FillPeers()
+    {
+        _trPeerList.Clear();
+        lock (Discovery.Devices)
+            foreach (var d in Discovery.Devices)
+                _trPeerList.Add($"{d.Ip}:{d.Port}  ·  {d.Name}");
+        if (_trPeers != null)
+        {
+            var sel = _trPeers.SelectedItem as string;
+            _trPeers.ItemsSource = null;
+            _trPeers.ItemsSource = _trPeerList;
+            if (sel != null) _trPeers.SelectedItem = sel;
+        }
+    }
 
     public MainWindow()
     {
@@ -79,8 +575,8 @@ public sealed partial class MainWindow : Window
 #if !ANDROID
         _logo = LoadLogo();
         Icon = _logo;
-#endif
         Title = "QBasCopier&Transfer";
+#endif
         BuildWindow();
         _ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Clamp(S.WindowUpdateMs, 50, 1000)) };
         _ticker.Tick += (_, _) => Tick();
@@ -255,6 +751,7 @@ public sealed partial class MainWindow : Window
         _tabs.Items.Add(MkTab(TabErrors, MakeErrBody()));
         _tabs.Items.Add(MkTab(TabOptions, new ScrollViewer { Content = BuildOptsGrid() }));
         _tabs.Items.Add(MkTab(TabHistory, MakeHistBody()));
+        _tabs.Items.Add(MkTab(TabTransfer, BuildTransferBody()));
         Grid.SetRow(_tabs, 0);
         body.Children.Add(_tabs);
 
@@ -621,6 +1118,12 @@ public sealed partial class MainWindow : Window
         about.Children.Add(aboutBody);
         col.Children.Add(about);
 
+        var foot = new StackPanel { Spacing = 3, Margin = new Thickness(0, 14, 0, 0) };
+        foot.Children.Add(MkLbl("Creado por QBaswing Designer · 2026", 11).Tint(TextSoft));
+        foot.Children.Add(MkLbl("Asociado a Freeman y Diseños", 11).Tint(TextSoft));
+        foot.Children.Add(MkLbl("Todos los derechos reservados © 2026", 11).Tint(TextSoft));
+        col.Children.Add(foot);
+
         Grid.SetColumn(col, 0);
         g.Children.Add(col);
         Grid.SetColumn(checks, 1);
@@ -840,12 +1343,22 @@ public sealed partial class MainWindow : Window
             _lblCur.Text = cur != null ? $"{L.Get("currentFile")}: {cur.Name}" : "";
             _miniLbl.Text = _lblProg.Text + "  " + _lblRate.Text;
             _miniBar.Value = pct;
+            #if !ANDROID
             if (S.ShowInTitle) Title = $"QBasCopier&Transfer · {pct:0.#}%";
+#endif
         }
         else
         {
             _lastTickTicks = 0;
+#if !ANDROID
             if (S.ShowInTitle) Title = "QBasCopier&Transfer";
+#endif
+        }
+
+        if (_trRx != null && _trSrv.Running)
+        {
+            _trRx.Text = "Recibidos en sesión: " + FilePane.Human(_trRxBytes);
+            if (NetTools.Now - _trLastFill > 3000) { _trLastFill = NetTools.Now; FillPeers(); }
         }
 
         var cmd = Program.WaitCommand(0);
@@ -877,8 +1390,15 @@ public sealed partial class MainWindow : Window
         if (!string.IsNullOrEmpty(dest)) _tbTo.Text = dest;
         foreach (var p in paths)
         {
+            if (string.IsNullOrEmpty(p)) continue;
             try
             {
+                bool isContent = p.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
+                if (isContent)
+                {
+                    _queue.Add(new CopyItem { SourcePath = p, IsDirectory = false, IsContent = true });
+                    continue;
+                }
                 bool isDir = Directory.Exists(p) && !File.Exists(p);
                 if (isDir || File.Exists(p))
                     _queue.Add(new CopyItem { SourcePath = p, IsDirectory = isDir });

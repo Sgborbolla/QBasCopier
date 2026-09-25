@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace QBasCopier;
 
@@ -14,6 +16,7 @@ public sealed class HistoryEntry
 public static class HistoryStore
 {
     private static readonly JsonSerializerOptions Opt = new() { WriteIndented = false };
+    private static readonly SemaphoreSlim _gate = new(1, 1);
 
     [System.Text.Json.Serialization.JsonIgnore]
     public static string PathDir =>
@@ -34,6 +37,7 @@ public static class HistoryStore
 
     public static async Task AppendAsync(string src, string dst, string result, long done)
     {
+        await _gate.WaitAsync();
         try
         {
             Directory.CreateDirectory(PathDir);
@@ -56,6 +60,7 @@ public static class HistoryStore
             await File.WriteAllTextAsync(PathFile, JsonSerializer.Serialize(list, Opt));
         }
         catch { }
+        finally { _gate.Release(); }
     }
 
     public static async Task ClearAsync()

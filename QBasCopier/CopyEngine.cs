@@ -20,6 +20,7 @@ public sealed class CopyItem : INotifyPropertyChanged
     public string SourcePath { get; set; } = "";
     public string DestPath { get; set; } = "";
     public bool IsDirectory { get; set; }
+    public bool IsContent { get; set; }   // true cuando SourcePath es content:// (Android/SAF)
 
     private long _total;
     public long TotalBytes { get => _total; set { _total = value; On(nameof(TotalBytes)); On(nameof(Percent)); } }
@@ -281,9 +282,9 @@ public sealed class CopyEngine
                 await CopyFileWithEngineAsync(it, resume, ct);
 
             CopyMetadata(it);
-            if (S.VerifyChecksum && !it.IsDirectory) VerifyIntegrity(it);
+            if (S.VerifyChecksum && !it.IsDirectory && !it.IsContent) VerifyIntegrity(it);
 
-            if (Move)
+            if (Move && !it.IsContent)
             {
                 try { if (it.IsDirectory) Directory.Delete(it.SourcePath, true); else File.Delete(it.SourcePath); }
                 catch { }
@@ -313,6 +314,7 @@ public sealed class CopyEngine
 
     private bool SkipHiddenOrSystem(CopyItem it)
     {
+        if (it.IsContent) return false;
         if (!S.SkipHiddenSystem) return false;
         try { return (File.GetAttributes(it.SourcePath) & (FileAttributes.Hidden | FileAttributes.System)) != 0; }
         catch { return false; }
@@ -323,6 +325,16 @@ public sealed class CopyEngine
         size = -1;
         try
         {
+            if (it.IsContent)
+            {
+#if ANDROID
+                var (_, sz) = QBasCopier.Android.DroidFile.Info(it.SourcePath);
+                size = sz;
+                return true;
+#else
+                return false;
+#endif
+            }
             if (it.IsDirectory)
             {
                 size = new DirectoryInfo(it.SourcePath)
@@ -375,12 +387,50 @@ public sealed class CopyEngine
     // ------------- native + buffer engines -------------
     private async Task CopyFileWithEngineAsync(CopyItem it, bool resumeOffset, CancellationToken ct)
     {
+        if (it.IsContent)
+        {
+#if ANDROID
+            await ContentCopyAsync(it, ct);
+#else
+            await BufferedCopyAsync(it, resumeOffset, ct);
+#endif
+            return;
+        }
         bool useNative = S.Engine != "buffer" && !resumeOffset && OperatingSystem.IsWindows();
         if (useNative)
             await NativeCopyAsync(it, ct);
         else
             await BufferedCopyAsync(it, resumeOffset, ct);
     }
+
+#if ANDROID
+    private async Task ContentCopyAsync(CopyItem it, CancellationToken ct)
+    {
+        using var src = QBasCopier.Android.DroidList.Open(it.SourcePath);
+        int buf = (int)Math.Clamp(S.BufferBytes, 64 * 1024, 64 * 1024 * 1024);
+        var dir = Path.GetDirectoryName(it.DestPath);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+        await using var dst = new FileStream(it.DestPath, FileMode.Create, FileAccess.Write, FileShare.None, buf, true);
+        var buffer = new byte[buf];
+        long done = 0;
+        while (true)
+        {
+            _gate.Wait(ct);
+            if (_paused) continue;
+            ct.ThrowIfCancellationRequested();
+            int n = await src.ReadAsync(buffer, 0, buf, ct);
+            if (n <= 0) break;
+            Throttle(n);
+            await dst.WriteAsync(buffer.AsMemory(0, n), ct);
+            done += n;
+            it.DoneBytes = done;
+            it.TotalBytes = it.TotalBytes > 0 ? it.TotalBytes : done;
+            Interlocked.Add(ref _doneBytes, n);
+            ItemStatus?.Invoke(it);
+            TotalsChanged?.Invoke();
+        }
+    }
+#endif
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CopyFileEx(string existing, string nw, CopyProgressRoutine? proc,
@@ -521,6 +571,7 @@ public sealed class CopyEngine
 
     private void CopyMetadata(CopyItem it)
     {
+        if (it.IsContent) return;
         try
         {
             File.SetAttributes(it.DestPath, File.GetAttributes(it.SourcePath));

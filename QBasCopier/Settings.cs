@@ -46,6 +46,15 @@ public sealed class Settings
     public bool SaveLog { get; set; }
     public long DiskWarnMb { get; set; }
 
+    // Transferir (QBasCopier&Transfer)
+    public bool TransferOn { get; set; }
+    public int TransferPort { get; set; } = 9527;
+    public string TransferNet { get; set; } = "QBasWing-Transfer";
+    public string TransferKey { get; set; } = "QBas2026";
+    public string TransferInbox { get; set; } = "";
+    public bool TransferAuto { get; set; }
+    public string DeviceName { get; set; } = "";
+
     [JsonIgnore] public static string Dir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "QBasCopier");
 

@@ -55,6 +55,9 @@ public sealed class FilePane : UserControl
 
     private static string HomePath()
     {
+#if ANDROID
+        return QBasCopier.Android.DroidList.Home();
+#else
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (Directory.Exists(home)) return home;
         try
@@ -64,6 +67,7 @@ public sealed class FilePane : UserControl
         }
         catch { }
         return Directory.GetCurrentDirectory();
+#endif
     }
 
     private void Build()
@@ -92,6 +96,17 @@ public sealed class FilePane : UserControl
         _pathTb.KeyDown += (s, e) => { if (e.Key == Key.Enter) Navigate(_pathTb.Text ?? ""); };
         nav.Children.Add(_pathTb);
         nav.Children.Add(MkSm("⟳", () => { RefreshDrives(); Navigate(CurrentPath); }));
+#if ANDROID
+        nav.Children.Add(MkSm("Abrir…", () =>
+        {
+            var ma = QBasCopier.Android.MainActivity.Current;
+            if (ma == null) return;
+            ma.PickTree(uri =>
+            {
+                if (!string.IsNullOrEmpty(uri)) Navigate(QBasCopier.Android.DroidList.Root(uri));
+            });
+        }));
+#endif
         Grid.SetRow(nav, 1);
         grid.Children.Add(nav);
 
@@ -201,6 +216,13 @@ public sealed class FilePane : UserControl
     {
         try
         {
+#if ANDROID
+            if (path.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+            {
+                AndroidLoadDir(path);
+                return;
+            }
+#endif
             if (Directory.Exists(path))
             {
                 if (CurrentPath.Length > 0) _back.Add(CurrentPath);
@@ -211,6 +233,34 @@ public sealed class FilePane : UserControl
         }
         catch { }
     }
+
+#if ANDROID
+    private void AndroidLoadDir(string docUri)
+    {
+        if (CurrentPath.Length > 0 && CurrentPath != docUri) _back.Add(CurrentPath);
+        _entries.Clear();
+        foreach (var ch in QBasCopier.Android.DroidList.Children(docUri))
+        {
+            _entries.Add(new PaneEntry
+            {
+                Name = ch.Name,
+                FullPath = ch.Uri,
+                IsDir = ch.IsDir,
+                Size = ch.Size,
+                SizeText = ch.IsDir ? "" : Human(ch.Size),
+                Modified = "",
+                Type = ch.IsDir ? "" : Path.GetExtension(ch.Name).TrimStart('.')
+            });
+        }
+        _entries.Sort((a, b) => b.IsDir.CompareTo(a.IsDir) != 0 ? b.IsDir.CompareTo(a.IsDir) : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+        CurrentPath = docUri;
+        _fwd.Clear();
+        _pathTb.Text = docUri;
+        _lv.ItemsSource = null;
+        _lv.ItemsSource = _entries;
+        PathChanged?.Invoke();
+    }
+#endif
 
     private void LoadDir(string dir, string root)
     {
@@ -273,6 +323,9 @@ public sealed class FilePane : UserControl
     {
         var full = CurrentPath;
         if (full.Length == 0) return;
+#if ANDROID
+        if (full.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) return;
+#endif
         var up = Path.GetDirectoryName(full.TrimEnd('\\', '/'));
         if (up == null || up == full) return;
         Navigate(up);
@@ -304,6 +357,32 @@ public sealed class FilePane : UserControl
     {
         try
         {
+#if ANDROID
+            if (p.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+            {
+                CurrentPath = p;
+                _pathTb.Text = p;
+                _entries.Clear();
+                foreach (var ch in QBasCopier.Android.DroidList.Children(p))
+                {
+                    _entries.Add(new PaneEntry
+                    {
+                        Name = ch.Name,
+                        FullPath = ch.Uri,
+                        IsDir = ch.IsDir,
+                        Size = ch.Size,
+                        SizeText = ch.IsDir ? "" : Human(ch.Size),
+                        Modified = "",
+                        Type = ch.IsDir ? "" : Path.GetExtension(ch.Name).TrimStart('.')
+                    });
+                }
+                _entries.Sort((a, b) => b.IsDir.CompareTo(a.IsDir) != 0 ? b.IsDir.CompareTo(a.IsDir) : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+                _lv.ItemsSource = null;
+                _lv.ItemsSource = _entries;
+                PathChanged?.Invoke();
+                return;
+            }
+#endif
             if (Directory.Exists(p)) LoadDir(p, Path.GetPathRoot(p) ?? p);
         }
         catch { }
@@ -313,7 +392,17 @@ public sealed class FilePane : UserControl
     {
         if (_lv.SelectedItem is PaneEntry pe)
         {
-            if (pe.IsDir) Navigate(pe.FullPath);
+            if (pe.IsDir)
+            {
+#if ANDROID
+                if (pe.FullPath.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+                {
+                    Navigate(pe.FullPath);
+                    return;
+                }
+#endif
+                Navigate(pe.FullPath);
+            }
             else OpenFile(pe.FullPath);
         }
     }
@@ -322,6 +411,13 @@ public sealed class FilePane : UserControl
     {
         try
         {
+#if ANDROID
+            if (path.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+            {
+                QBasCopier.Android.DroidList.View(path);
+                return;
+            }
+#endif
             var psi = new System.Diagnostics.ProcessStartInfo { FileName = path, UseShellExecute = true };
             System.Diagnostics.Process.Start(psi);
         }
