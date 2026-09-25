@@ -6,23 +6,23 @@
   <Application.Resources>
 
     <!-- Paleta original QBasCopier (extraída del binario) -->
-    <SolidColorBrush x:Key="BgBase">#05091C</SolidColorBrush>
-    <SolidColorBrush x:Key="BgPanel">#060D24</SolidColorBrush>
-    <SolidColorBrush x:Key="BgDeep">#08122F</SolidColorBrush>
-    <SolidColorBrush x:Key="BgHeader">#0B1740</SolidColorBrush>
-    <SolidColorBrush x:Key="BgHover">#1A2C6E</SolidColorBrush>
-    <SolidColorBrush x:Key="Accent">#002A8F</SolidColorBrush>
-    <SolidColorBrush x:Key="AccentMid">#12307D</SolidColorBrush>
-    <SolidColorBrush x:Key="AccentLight">#2A7DE1</SolidColorBrush>
-    <SolidColorBrush x:Key="TextMain">#F6F8FF</SolidColorBrush>
-    <SolidColorBrush x:Key="TextSoft">#9FB3E8</SolidColorBrush>
-    <SolidColorBrush x:Key="TextBlue">#6FB1FC</SolidColorBrush>
-    <SolidColorBrush x:Key="Red">#CF142B</SolidColorBrush>
-    <SolidColorBrush x:Key="RedDark">#B01226</SolidColorBrush>
-    <SolidColorBrush x:Key="Gold">#FBBF24</SolidColorBrush>
-    <SolidColorBrush x:Key="Line">#1F3B8C</SolidColorBrush>
-    <SolidColorBrush x:Key="LineSoft">#3352A8</SolidColorBrush>
-    <SolidColorBrush x:Key="Water" Opacity="0.06">#6FB1FC</SolidColorBrush>
+    <SolidColorBrush x:Key="BgBase" Color="#05091C"/>
+    <SolidColorBrush x:Key="BgPanel" Color="#060D24"/>
+    <SolidColorBrush x:Key="BgDeep" Color="#08122F"/>
+    <SolidColorBrush x:Key="BgHeader" Color="#0B1740"/>
+    <SolidColorBrush x:Key="BgHover" Color="#1A2C6E"/>
+    <SolidColorBrush x:Key="Accent" Color="#002A8F"/>
+    <SolidColorBrush x:Key="AccentMid" Color="#12307D"/>
+    <SolidColorBrush x:Key="AccentLight" Color="#2A7DE1"/>
+    <SolidColorBrush x:Key="TextMain" Color="#F6F8FF"/>
+    <SolidColorBrush x:Key="TextSoft" Color="#9FB3E8"/>
+    <SolidColorBrush x:Key="TextBlue" Color="#6FB1FC"/>
+    <SolidColorBrush x:Key="Red" Color="#CF142B"/>
+    <SolidColorBrush x:Key="RedDark" Color="#B01226"/>
+    <SolidColorBrush x:Key="Gold" Color="#FBBF24"/>
+    <SolidColorBrush x:Key="Line" Color="#1F3B8C"/>
+    <SolidColorBrush x:Key="LineSoft" Color="#3352A8"/>
+    <SolidColorBrush x:Key="Water" Color="#6FB1FC" Opacity="0.06"/>
 
   </Application.Resources>
 
