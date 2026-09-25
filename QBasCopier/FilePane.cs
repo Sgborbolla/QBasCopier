@@ -96,7 +96,7 @@ public sealed class FilePane : UserControl
         grid.Children.Add(nav);
 
         _lv.ItemsPanel = new FuncTemplate<Panel>(() => new StackPanel());
-        _lv.ItemTemplate = new FuncDataTemplate<PaneEntry>(BuildRow);
+        _lv.ItemTemplate = new FuncDataTemplate<PaneEntry>(e => BuildRow(e));
         _lv.SelectionChanged += (s, e) => SelectionChanged?.Invoke();
         _lv.DoubleTapped += OnDouble;
         DragDrop.SetAllowDrop(_lv, true);
