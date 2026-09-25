@@ -20,6 +20,16 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Fijar SDK 8 para el build (el runner preinstala el 10 y se adelanta)
+        run: |
+          set -e
+          for d in /usr/share/dotnet/sdk/10.*; do
+            [ -d "$d" ] && sudo rm -rf "$d"
+          done
+          echo "dotnet --version => $(dotnet --version)"
+          dotnet --list-sdks
+          [ "$(dotnet --version | cut -d. -f1)" = "8" ] || { echo "FALLO: no quedó el SDK 8"; exit 1; }
+
       - name: Instalar workload android (JDK y Android SDK se descargan solos)
         run: dotnet workload install android
 
