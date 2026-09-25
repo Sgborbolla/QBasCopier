@@ -6,7 +6,7 @@ on:
     branches: [ main, master ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build_apk:
@@ -45,3 +45,13 @@ jobs:
           name: QBasCopier-apk
           path: QBasCopier.Android/bin/Release/net8.0-android*/*.apk
           if-no-files-found: error
+
+      - name: Publicar el APK en un release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          apk=$(ls QBasCopier.Android/bin/Release/net8.0-android*/*.apk | head -1)
+          cp "$apk" QBasCopier.apk
+          gh release delete v1.0-apk --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create v1.0-apk QBasCopier.apk --title "QBasCopier 1.0" --notes "APK compilado con GitHub Actions"
