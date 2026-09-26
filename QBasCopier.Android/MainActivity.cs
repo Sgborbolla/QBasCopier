@@ -512,18 +512,11 @@ public class MainActivity : AvaloniaMainActivity<App>
         base.OnDestroy();
     }
 
-    public override void OnTrimMemory(global::Android.ComponentModels.ActivityManager.TrimMemoryLevel level)
-    {
-        base.OnTrimMemory(level);
-        if (level >= global::Android.ComponentModels.ActivityManager.TrimMemoryLevel.UiHidden) ReleaseLocks();
-    }
-
     PowerManager? _pm;
     PowerManager.WakeLock? _wake;
-    global::Android.Wifi.WifiLock? _wifi;
 
     /// <summary>
-    /// Mantiene la CPU y el WiFi vivos mientras hay una copia o una transferencia.
+    /// Mantiene la CPU viva mientras hay una copia o una transferencia.
     /// Sin esto, con la pantalla apagada Android congela la app a mitad de un archivo
     /// de 2 GB y la copia se queda parada sin error visible.
     /// </summary>
@@ -539,12 +532,6 @@ public class MainActivity : AvaloniaMainActivity<App>
                 _wake.SetReferenceCounted(false);
             }
             if (!_wake.IsHeld) _wake.Acquire(TimeSpan.FromMinutes(6 * 60));
-            if (_wifi == null)
-            {
-                _wifi = _pm.NewWifiLock(PowerManager.WifiModeFullHighPerf, "QBasCopier:transfer");
-                _wifi.SetReferenceCounted(false);
-            }
-            if (!_wifi.IsHeld) _wifi.Acquire();
         }
         catch { }
     }
@@ -552,7 +539,6 @@ public class MainActivity : AvaloniaMainActivity<App>
     public void ReleaseLocks()
     {
         try { if (_wake != null && _wake.IsHeld) _wake.Release(); } catch { }
-        try { if (_wifi != null && _wifi.IsHeld) _wifi.Release(); } catch { }
     }
 
     public void PickFiles(Action<string[]> done)
