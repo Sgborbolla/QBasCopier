@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# QBasCopier - make-app.sh
+# QBasCopier&Transfer - make-app.sh
 # Crea el bundle .app para macOS (solo en un Mac con .NET SDK 10).
 #   ./make-app.sh osx-arm64   (Apple Silicon)
 #   ./make-app.sh osx-x64     (Intel)
@@ -14,7 +14,7 @@ dotnet publish "QBasCopier/QBasCopier.csproj" -c Release -r "$RID" --self-contai
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -o "dist/app"
 
-APP="dist/QBasCopier.app"
+APP="dist/QBasCopier&Transfer.app"
 echo "[2/3] Creando bundle..."
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cat > "$APP/Contents/Info.plist" <<EOF
@@ -22,22 +22,22 @@ cat > "$APP/Contents/Info.plist" <<EOF
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>QBasCopier</string>
-  <key>CFBundleDisplayName</key><string>QBasCopier</string>
+  <key>CFBundleName</key><string>QBasCopier&Transfer</string>
+  <key>CFBundleDisplayName</key><string>QBasCopier&Transfer</string>
   <key>CFBundleIdentifier</key><string>com.qbaswing.qbascopier</string>
   <key>CFBundleVersion</key><string>1.0</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleExecutable</key><string>QBasCopier</string>
+  <key>CFBundleExecutable</key><string>QBasCopier&Transfer</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>
 EOF
-cp -f "dist/app/QBasCopier" "$APP/Contents/MacOS/QBasCopier"
+cp -f "dist/app/QBasCopier" "$APP/Contents/MacOS/QBasCopier&Transfer"
 cp -f "QBasCopier/Assets/logo.png" "$APP/Contents/Resources/logo.png" 2>/dev/null || true
-chmod +x "$APP/Contents/MacOS/QBasCopier"
+chmod +x "$APP/Contents/MacOS/QBasCopier&Transfer"
 
 echo "[3/3] Firmando (ad-hoc)..."
 codesign --force --deep --sign - "$APP" 2>/dev/null || echo "  (codesign no disponible, se omite)"
-echo "LISTO: dist/QBasCopier.app  (arrastralo a /Applications)"
+echo "LISTO: dist/QBasCopier&Transfer.app  (arrastralo a /Applications)"

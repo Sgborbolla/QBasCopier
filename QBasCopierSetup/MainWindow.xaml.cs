@@ -193,7 +193,7 @@ public partial class MainWindow : Window
             File.WriteAllText(Path.Combine(settingsDir, "settings.json"),
                 JsonSerializer.Serialize(new { Lang = code }, new JsonSerializerOptions { WriteIndented = true }));
 
-            _destExe = Path.Combine(dest, "QBasCopier.exe");
+            _destExe = Path.Combine(dest, "QBasCopier&Transfer.exe");
             SetUi(15, SetupLoc.Get(6));
             await Task.Run(() =>
             {

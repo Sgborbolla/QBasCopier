@@ -1,7 +1,7 @@
 <Window x:Class="QBasCopierSetup.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="QBasCopier Setup" Height="560" Width="700"
+        Title="QBasCopier&Transfer Setup" Height="560" Width="700"
         WindowStartupLocation="CenterScreen"
         Background="#05091C" Foreground="#F6F8FF"
         FontFamily="Segoe UI" ResizeMode="CanMinimize">
