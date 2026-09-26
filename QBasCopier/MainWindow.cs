@@ -933,14 +933,14 @@ public sealed partial class MainWindow : Window
 
         _sldThreads = new Slider { Minimum = 1, Maximum = 32, TickFrequency = 1, IsSnapToTickEnabled = true, Value = S.Threads };
         _lblThreads = MkLbl(S.Threads.ToString(), 13);
-        _sldThreads.ValueChanged += (s, e) => { S.Threads = (int)e.NewValue; _lblThreads.Text = ((int)e.NewValue).ToString(); S.Save(); };
+        _sldThreads.ValueChanged += (s, e) => { S.Threads = (int)e.NewValue; _lblThreads.Text = ((int)e.NewValue).ToString(); S.SaveSoon(); };
 
         _tbBuffer = new TextBox { Text = (S.BufferBytes / 1024).ToString(), Width = 100 };
-        _tbBuffer.TextChanged += (s, e) => { if (long.TryParse(_tbBuffer.Text, out var v) && v >= 16) { S.BufferBytes = v * 1024; S.Save(); } };
+        _tbBuffer.TextChanged += (s, e) => { if (long.TryParse(_tbBuffer.Text, out var v) && v >= 16) { S.BufferBytes = v * 1024; S.SaveSoon(); } };
         _tbRetry = new TextBox { Text = S.RetryIntervalMs.ToString(), Width = 100 };
-        _tbRetry.TextChanged += (s, e) => { if (int.TryParse(_tbRetry.Text, out var v) && v > 0) { S.RetryIntervalMs = v; S.Save(); } };
+        _tbRetry.TextChanged += (s, e) => { if (int.TryParse(_tbRetry.Text, out var v) && v > 0) { S.RetryIntervalMs = v; S.SaveSoon(); } };
         _tbSpeed = new TextBox { Text = S.SpeedLimitKb.ToString(), Width = 110 };
-        _tbSpeed.TextChanged += (s, e) => { if (long.TryParse(_tbSpeed.Text, out var v)) { S.SpeedLimitKb = v; S.Save(); } };
+        _tbSpeed.TextChanged += (s, e) => { if (long.TryParse(_tbSpeed.Text, out var v)) { S.SpeedLimitKb = v; S.SaveSoon(); } };
         _chkLimit = MkChk("", S.SpeedLimitEnabled, b => { S.SpeedLimitEnabled = b; S.Save(); });
 
         var bufPresets = new long[] { 64, 256, 1024, 4096, 16384, 65536 };
@@ -965,18 +965,18 @@ public sealed partial class MainWindow : Window
         _lblSpeed = MkLbl("", 12);
         _sldSpeed.Value = Math.Clamp((int)Math.Round(S.SpeedLimitKb / 1024.0), 0, 100);
         _lblSpeed.Text = ((int)_sldSpeed.Value).ToString() + " MB/s";
-        _sldSpeed.ValueChanged += (s, e) => { _lblSpeed.Text = ((long)e.NewValue).ToString() + " MB/s"; _tbSpeed.Text = ((long)e.NewValue * 1024).ToString(); S.SpeedLimitKb = (long)e.NewValue * 1024; S.Save(); };
+        _sldSpeed.ValueChanged += (s, e) => { _lblSpeed.Text = ((long)e.NewValue).ToString() + " MB/s"; _tbSpeed.Text = ((long)e.NewValue * 1024).ToString(); S.SpeedLimitKb = (long)e.NewValue * 1024; S.SaveSoon(); };
 
         _tbUpdate = new TextBox { Text = S.WindowUpdateMs.ToString(), Width = 100 };
-        _tbUpdate.TextChanged += (s, e) => { if (int.TryParse(_tbUpdate.Text, out var v) && v >= 50) { S.WindowUpdateMs = v; _ticker.Interval = TimeSpan.FromMilliseconds(v); S.Save(); } };
+        _tbUpdate.TextChanged += (s, e) => { if (int.TryParse(_tbUpdate.Text, out var v) && v >= 50) { S.WindowUpdateMs = v; _ticker.Interval = TimeSpan.FromMilliseconds(v); S.SaveSoon(); } };
         _tbAvg = new TextBox { Text = S.SpeedAvgMs.ToString(), Width = 100 };
-        _tbAvg.TextChanged += (s, e) => { if (int.TryParse(_tbAvg.Text, out var v) && v >= 100) { S.SpeedAvgMs = v; S.Save(); Tick(); } };
+        _tbAvg.TextChanged += (s, e) => { if (int.TryParse(_tbAvg.Text, out var v) && v >= 100) { S.SpeedAvgMs = v; S.SaveSoon(); Tick(); } };
         _tbThrottle = new TextBox { Text = S.ThrottleMs.ToString(), Width = 100 };
-        _tbThrottle.TextChanged += (s, e) => { if (int.TryParse(_tbThrottle.Text, out var v) && v >= 0) { S.ThrottleMs = v; S.Save(); } };
+        _tbThrottle.TextChanged += (s, e) => { if (int.TryParse(_tbThrottle.Text, out var v) && v >= 0) { S.ThrottleMs = v; S.SaveSoon(); } };
         _tbWarn = new TextBox { Text = S.DiskWarnMb.ToString(), Width = 110 };
-        _tbWarn.TextChanged += (s, e) => { if (long.TryParse(_tbWarn.Text, out var v) && v >= 0) { S.DiskWarnMb = v; S.Save(); } };
+        _tbWarn.TextChanged += (s, e) => { if (long.TryParse(_tbWarn.Text, out var v) && v >= 0) { S.DiskWarnMb = v; S.SaveSoon(); } };
         _tbNewPat = new TextBox { Text = S.RenameNewPattern, Width = 240 };
-        _tbNewPat.TextChanged += (s, e) => { S.RenameNewPattern = string.IsNullOrWhiteSpace(_tbNewPat.Text) ? "%NAME% (%COPY%)%EXT%" : _tbNewPat.Text; S.Save(); };
+        _tbNewPat.TextChanged += (s, e) => { S.RenameNewPattern = string.IsNullOrWhiteSpace(_tbNewPat.Text) ? "%NAME% (%COPY%)%EXT%" : _tbNewPat.Text; S.SaveSoon(); };
 
         _chkVerify = MkChk(Ex.Get("verify"), S.VerifyChecksum, b => { S.VerifyChecksum = b; S.Save(); });
         _chkActivate = MkChk(Ex.Get("activateOnStart"), S.ActivateOnStart, b => { S.ActivateOnStart = b; S.Save(); });
@@ -1561,7 +1561,7 @@ public sealed partial class MainWindow : Window
     private void DoQuit()
     {
         _forceClose = true;
-        try { S.Save(); } catch { }
+        try { Settings.Flush(); S.Save(); } catch { }
         Close();
     }
 

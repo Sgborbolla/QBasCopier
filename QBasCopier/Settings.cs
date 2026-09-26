@@ -95,4 +95,28 @@ public sealed class Settings
         }
         catch { }
     }
+
+    private static readonly System.Threading.Timer _debounce =
+        new(_ => _pending?.Save(), null, System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+    private static Settings? _pending;
+
+    /// <summary>
+    /// Guardado con retardo, para los campos que cambian en cada tecla o en cada tick
+    /// de un deslizador. Antes cada pulsacion de teclado y cada movimiento del slider
+    /// reserializaba y escribia settings.json en disco, y en un celular eso traba la
+    /// interfaz. Se agrupan los cambios y se escribe una sola vez 600 ms despues.
+    /// </summary>
+    public void SaveSoon()
+    {
+        _pending = this;
+        try { _debounce.Change(600, System.Threading.Timeout.InfiniteTimeSpan); } catch { }
+    }
+
+    /// <summary>Fuerza la escritura de lo pendiente (al cerrar la app).</summary>
+    public static void Flush()
+    {
+        try { _debounce.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite); } catch { }
+        _pending?.Save();
+        _pending = null;
+    }
 }
