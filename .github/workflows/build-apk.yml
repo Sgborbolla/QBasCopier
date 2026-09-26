@@ -42,7 +42,9 @@ jobs:
         run: dotnet workload install android
 
       - name: Compilar el APK
-        run: dotnet build "QBasCopier.Android/QBasCopier.Android.csproj" -c Release -t:SignAndroidPackage
+        run: |
+          set -o pipefail
+          dotnet build "QBasCopier.Android/QBasCopier.Android.csproj" -c Release -t:SignAndroidPackage 2>&1 | tee /tmp/build.log
 
       - name: Subir el APK como artefacto
         uses: actions/upload-artifact@v4
@@ -83,12 +85,32 @@ jobs:
 
       - name: Publicar el .exe de Windows (portatil, un solo archivo)
         run: |
-          set -e
+          set -o pipefail
           dotnet publish "QBasCopier/QBasCopier.csproj" -c Release -r win-x64 \
             --self-contained true -p:PublishSingleFile=true \
             -p:IncludeNativeLibrariesForSelfExtract=true \
-            -o dist/windows
+            -o dist/windows 2>&1 | tee /tmp/build.log
           ls -la dist/windows
+
+      - name: Dejar el log de compilacion en el repo
+        if: ${{ failure() }}
+        run: |
+          set +e
+          {
+            echo "# Log de compilacion"
+            echo
+            echo "Commit: ${{ github.sha }}"
+            echo "Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo '```'
+            cat /tmp/build.log
+            echo '```'
+          } > LOG-DE-COMPILACION.md
+          git config user.name  "CI"
+          git config user.email "ci@localhost"
+          git add LOG-DE-COMPILACION.md
+          git commit -m "log de compilacion del run ${{ github.run_id }}" || true
+          git push origin HEAD:${{ github.ref_name }} || true
 
       - name: Empaquetar en ZIP
         run: |
