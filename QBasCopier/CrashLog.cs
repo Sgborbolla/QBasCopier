@@ -90,10 +90,10 @@ public static class CrashLog
                             global::Android.OS.Environment.DirectoryDownloads);
                         if (dl != null && (dl.Mkdirs() || dl.Exists()))
                         {
-                            var f = new Java.IO.File(dl, "QBasCopier-crash.txt");
-                            using var os = f.OutputStream();
-                            using var w = new StreamWriter(os);
-                            w.Write(full);
+                            // Se escribe por ruta: Java.IO.File chocaba con el alias
+                            // global using File = System.IO.File del proyecto Android.
+                            System.IO.File.WriteAllText(
+                                System.IO.Path.Combine(dl.AbsolutePath ?? "", "QBasCopier-crash.txt"), full);
                         }
 #pragma warning restore CA1422, CS0618
                     }
