@@ -22,12 +22,12 @@ public partial class App : Application
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                CrashLog.Info("creating MainWindow");
-                var w = new MainWindow();
-                CrashLog.Info("MainWindow created");
+                CrashLog.Info("creating DesktopWindow");
+                var w = new DesktopWindow();
+                CrashLog.Info("DesktopWindow created");
                 w.Closed += (_, _) => desktop.Shutdown();
                 desktop.MainWindow = w;
-                w.InitialBoot();
+                w.Content.As<MainWindow>()?.InitialBoot();
                 CrashLog.Info("InitialBoot done");
             }
 #if ANDROID
@@ -35,9 +35,11 @@ public partial class App : Application
             {
                 // En Android el lifetime es un SingleViewLifetime y la activity hace
                 // SetContentView(lifetime.MainView). Sin esto no hay nada que mostrar:
-                // lienzo blanco, sin crash. Es lo que pasaba.
-                CrashLog.Info("creating MainView (Android)");
-                singleView.MainView = new MainView();
+                // lienzo blanco, sin crash.
+                CrashLog.Info("creating MainWindow (Android)");
+                var view = new MainWindow();
+                view.InitialBoot();
+                singleView.MainView = view;
                 CrashLog.Info("MainView assigned");
             }
 #endif

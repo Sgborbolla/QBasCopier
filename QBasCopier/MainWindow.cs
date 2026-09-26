@@ -15,9 +15,16 @@ using System.IO;
 
 namespace QBasCopier;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow : UserControl
 {
     public static Settings S = new();
+
+#if !ANDROID
+    /// En escritorio la UI se muestra dentro de una ventana real. Android no puede
+    /// ni construir un Window, asi que ahi este control va directo al MainView.
+    public static Window? Host { get; set; }
+    public static Bitmap? LogoBmp => _logoBmp;
+#endif
 
     // ---------- fábricas ----------
     private static IBrush B(string hex) => new SolidColorBrush(Color.Parse(hex));
@@ -574,8 +581,6 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
 #if !ANDROID
         _logo = LoadLogo();
-        Icon = _logo;
-        Title = "QBasCopier&Transfer";
 #endif
         BuildWindow();
         _ticker = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(Math.Clamp(S.WindowUpdateMs, 50, 1000)) };
@@ -662,13 +667,13 @@ public sealed partial class MainWindow : Window
         if (hidden && paths.Count == 0)
         {
 #if !ANDROID
-            Hide();
+            Host?.Hide();
 #endif
             return;
         }
 #if !ANDROID
-        Show();
-        Activate();
+        Host?.Show();
+        Host?.Activate();
 #endif
         if (paths.Count > 0 && !string.IsNullOrEmpty(dest)) _ = Task.Delay(120).ContinueWith(_ => Dispatcher.UIThread.Post(() => _ = StartCopy(move)));
     }
@@ -692,34 +697,9 @@ public sealed partial class MainWindow : Window
 
     private static string DetectLikely() => CultureInfo.CurrentUICulture.Name;
 
-#if ANDROID
-    /// Android no usa IClassicDesktopStyleApplicationLifetime, asi que desktop.MainWindow
-    /// no existe ahi y la ventana nunca se muestra (pantalla en blanco, sin excepcion).
-    /// En vez de duplicar los ~90 kB de construccion de la UI, se construye la
-    /// MainWindow igual, se le traslada el contenido de su Root al Root del host y se
-    /// devuelve viva. La ventana no se muestra nunca: Show() es #if !ANDROID.
-    internal static MainWindow CreateEmbedded(Control host)
-    {
-        var w = new MainWindow();
-        var src = w.FindControl<Grid>("Root");
-        var dst = host.FindControl<Grid>("Root");
-        if (src?.Parent is Panel old && dst != null)
-        {
-            foreach (var child in src.Children.ToList())
-            {
-                old.Children.Remove(child);
-                dst.Children.Add(child);
-            }
-        }
-        w.InitialBoot();
-        return w;
-    }
-#endif
-
     // ---------------------------------------------------------------- build
     private void BuildWindow()
     {
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var root = this.FindControl<Grid>("Root");
         var main = new Grid
         {
@@ -1368,14 +1348,14 @@ public sealed partial class MainWindow : Window
             _miniLbl.Text = _lblProg.Text + "  " + _lblRate.Text;
             _miniBar.Value = pct;
             #if !ANDROID
-            if (S.ShowInTitle) Title = $"QBasCopier&Transfer · {pct:0.#}%";
+            if (S.ShowInTitle && Host != null) Host.Title = $"QBasCopier&Transfer · {pct:0.#}%";
 #endif
         }
         else
         {
             _lastTickTicks = 0;
 #if !ANDROID
-            if (S.ShowInTitle) Title = "QBasCopier&Transfer";
+            if (S.ShowInTitle && Host != null) Host.Title = "QBasCopier&Transfer";
 #endif
         }
 
@@ -1459,25 +1439,21 @@ public sealed partial class MainWindow : Window
     {
         var bOk = new Button { Content = L.Get("ok") };
         var bNo = new Button { Content = L.Get("cancel") };
-        var w = new Window
+        var res = await AskAsync(L.Get("addListsWhen"), 380, 170, done =>
         {
-            Width = 380, Height = 170, CanResize = false,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Title = L.Get("addListsWhen"),
-            Content = new StackPanel
+            bOk.Click += (_, _) => done(true);
+            bNo.Click += (_, _) => done(false);
+            return new StackPanel
             {
-                Margin = new Thickness(16), Spacing = 14,
+                Spacing = 14,
                 Children =
                 {
                     new TextBlock { Text = L.Get("askConfirm"), TextWrapping = TextWrapping.Wrap, FontSize = 13 },
                     new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Children = { bOk, bNo } }
                 }
-            }
-        };
-        bOk.Click += (_, _) => w.Close(true);
-        bNo.Click += (_, _) => w.Close(false);
-        var res = await w.ShowDialog<bool>(this);
-        if (res) Enqueue(paths, dest, move);
+            };
+        });
+        if (res == true) Enqueue(paths, dest, move);
     }
 
     private void RefreshQueueUi()
@@ -1586,56 +1562,91 @@ public sealed partial class MainWindow : Window
     {
         _forceClose = true;
         try { Settings.Flush(); S.Save(); } catch { }
-        Close();
+#if !ANDROID
+        Host?.Close();
+#endif
     }
 
     // ----------------------------------------------------------- diálogos
+    // En escritorio son una ventana modal; en Android no se puede construir un Window
+    // (WindowingPlatformStub.CreateWindow lanza NotSupportedException), asi que se
+    // superponen sobre la propia UI. Sin esto la copia se queda esperando para siempre
+    // en la primera colision o el primer error, porque el await nunca se completa.
+    private Task<T?> AskAsync<T>(string title, int width, int height, Func<Action<T?>, Control> build)
+    {
+#if ANDROID
+        var tcs = new TaskCompletionSource<T?>();
+        var root = this.FindControl<Grid>("Root");
+        if (root == null) { tcs.TrySetResult(default); return tcs.Task; }
+        var layer = new Grid { Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)) };
+        var card = new Border
+        {
+            Background = BgPanel, BorderBrush = Line, BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10), Padding = new Thickness(14), Margin = new Thickness(10),
+            HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = width
+        };
+        layer.Children.Add(card);
+        root.Children.Add(layer);
+        card.Child = build(v => { root.Children.Remove(layer); tcs.TrySetResult(v); });
+        return tcs.Task;
+#else
+        var win = new Window
+        {
+            Title = title, Width = width, Height = height, Background = BgPanel,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false
+        };
+        win.Content = build(v => win.Close(v));
+        return win.ShowDialog<T?>(Host);
+#endif
+    }
+
     private async Task<CollisionDecision> PickCollisionAsync(CopyItem it, string target)
     {
-        var res = new CollisionDecision(CopyAction.Overwrite, false);
-        var w = new Window { Width = 640, Height = 360, Title = L.Get("colTitle"), Background = BgPanel, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
-        var sp = new StackPanel { Margin = new Thickness(14), Spacing = 8 };
-        sp.Children.Add(MkLbl(L.Get("colTitle") + ":", 15));
-        sp.Children.Add(MkLbl(it.SourcePath, 12).Tint(TextSoft));
-        sp.Children.Add(MkLbl("→", 14).Tint(Gold));
-        sp.Children.Add(MkLbl(target, 12).Tint(TextSoft));
-        var chkAll = MkChk("", false, null);
-        Bind(chkAll, "allfiles");
-        sp.Children.Add(chkAll);
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 10, 0, 0) };
-        foreach (var (a, k) in new (CopyAction, string)[] { (CopyAction.Overwrite, "overwrite"), (CopyAction.OverwriteIfDifferent, "overwriteDiff"), (CopyAction.Resume, "resume"), (CopyAction.Rename, "rename"), (CopyAction.Skip, "skip"), (CopyAction.CancelAll, "cancel") })
+        var res = await AskAsync(L.Get("colTitle"), 640, 360, done =>
         {
-            var b = Mk("…", () => { res = new CollisionDecision(a, chkAll.IsChecked == true); w.Close(); });
-            b.Content = L.Get(k);
-            row.Children.Add(b);
-        }
-        sp.Children.Add(row);
-        w.Content = new Border { BorderBrush = Line, BorderThickness = new Thickness(1), Child = sp };
-        await Dispatcher.UIThread.InvokeAsync(() => w.ShowDialog(this));
-        return res;
+            var sp = new StackPanel { Spacing = 8 };
+            sp.Children.Add(MkLbl(L.Get("colTitle") + ":", 15));
+            sp.Children.Add(MkLbl(it.SourcePath, 12).Tint(TextSoft));
+            sp.Children.Add(MkLbl("→", 14).Tint(Gold));
+            sp.Children.Add(MkLbl(target, 12).Tint(TextSoft));
+            var chkAll = MkChk("", false, null);
+            Bind(chkAll, "allfiles");
+            sp.Children.Add(chkAll);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 10, 0, 0) };
+            foreach (var (a, k) in new (CopyAction, string)[] { (CopyAction.Overwrite, "overwrite"), (CopyAction.OverwriteIfDifferent, "overwriteDiff"), (CopyAction.Resume, "resume"), (CopyAction.Rename, "rename"), (CopyAction.Skip, "skip"), (CopyAction.CancelAll, "cancel") })
+            {
+                var b = Mk("…", () => done(new CollisionDecision(a, chkAll.IsChecked == true)));
+                b.Content = L.Get(k);
+                row.Children.Add(b);
+            }
+            sp.Children.Add(row);
+            return new Border { BorderBrush = Line, BorderThickness = new Thickness(1), Child = sp };
+        });
+        return res ?? new CollisionDecision(CopyAction.Overwrite, false);
     }
 
     private async Task<ErrorDecision> PickErrorAsync(CopyItem it, string msg)
     {
-        var res = new ErrorDecision(CopyAction.Skip, false);
-        var w = new Window { Width = 640, Height = 320, Title = L.Get("errTitle"), Background = BgPanel, WindowStartupLocation = WindowStartupLocation.CenterOwner, ShowInTaskbar = false };
-        var sp = new StackPanel { Margin = new Thickness(14), Spacing = 8 };
-        sp.Children.Add(MkLbl(it.SourcePath, 12).Tint(TextSoft));
-        sp.Children.Add(MkLbl(msg, 12).Tint(Red));
-        var chkAll = MkChk("", false, null);
-        Bind(chkAll, "allfiles");
-        sp.Children.Add(chkAll);
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 10, 0, 0) };
-        foreach (var (a, k) in new (CopyAction, string)[] { (CopyAction.Retry, "retry"), (CopyAction.Skip, "skip"), (CopyAction.CancelAll, "cancel") })
+        var res = await AskAsync(L.Get("errTitle"), 640, 320, done =>
         {
-            var b = Mk("…", () => { res = new ErrorDecision(a, chkAll.IsChecked == true); w.Close(); });
-            b.Content = L.Get(k);
-            row.Children.Add(b);
-        }
-        sp.Children.Add(row);
-        w.Content = new Border { BorderBrush = Line, BorderThickness = new Thickness(1), Child = sp };
-        await Dispatcher.UIThread.InvokeAsync(() => w.ShowDialog(this));
-        return res;
+            var sp = new StackPanel { Spacing = 8 };
+            sp.Children.Add(MkLbl(it.SourcePath, 12).Tint(TextSoft));
+            sp.Children.Add(MkLbl(msg, 12).Tint(Red));
+            var chkAll = MkChk("", false, null);
+            Bind(chkAll, "allfiles");
+            sp.Children.Add(chkAll);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 10, 0, 0) };
+            foreach (var (a, k) in new (CopyAction, string)[] { (CopyAction.Retry, "retry"), (CopyAction.Skip, "skip"), (CopyAction.CancelAll, "cancel") })
+            {
+                var b = Mk("…", () => done(new ErrorDecision(a, chkAll.IsChecked == true)));
+                b.Content = L.Get(k);
+                row.Children.Add(b);
+            }
+            sp.Children.Add(row);
+            return new Border { BorderBrush = Line, BorderThickness = new Thickness(1), Child = sp };
+        });
+        return res ?? new ErrorDecision(CopyAction.Skip, false);
     }
 
     // ----------------------------------------------------------- explorador
@@ -1688,17 +1699,8 @@ public sealed partial class MainWindow : Window
 #endif
     }
 
-    protected override void OnClosing(WindowClosingEventArgs e)
-    {
-        if (!_forceClose && S.MinimizeTo == "tray" && _tray != null)
-        {
-            e.Cancel = true;
-            Hide();
-            return;
-        }
-        try { S.Save(); } catch { }
-        base.OnClosing(e);
-    }
+    internal bool ForceClose { get => _forceClose; set => _forceClose = value; }
+    internal bool TrayVisible => _tray is { IsVisible: true };
 
     // ----------------------------------------------------------- util
     private static Button Mk(string text, Action? act)

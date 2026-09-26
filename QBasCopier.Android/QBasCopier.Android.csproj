@@ -40,7 +40,5 @@
     <AvaloniaResource Include="../QBasCopier/Assets/*.png" />
     <AvaloniaXaml Include="../QBasCopier/App.axaml" Link="App.axaml" />
     <AvaloniaXaml Include="../QBasCopier/MainWindow.axaml" Link="MainWindow.axaml" />
-    <!-- Android no usa Window: la activity hace SetContentView(lifetime.MainView). -->
-    <AvaloniaXaml Include="../QBasCopier/MainView.axaml" Link="MainView.axaml" />
   </ItemGroup>
 </Project>
