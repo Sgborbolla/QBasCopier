@@ -692,6 +692,30 @@ public sealed partial class MainWindow : Window
 
     private static string DetectLikely() => CultureInfo.CurrentUICulture.Name;
 
+#if ANDROID
+    /// Android no usa IClassicDesktopStyleApplicationLifetime, asi que desktop.MainWindow
+    /// no existe ahi y la ventana nunca se muestra (pantalla en blanco, sin excepcion).
+    /// En vez de duplicar los ~90 kB de construccion de la UI, se construye la
+    /// MainWindow igual, se le traslada el contenido de su Root al Root del host y se
+    /// devuelve viva. La ventana no se muestra nunca: Show() es #if !ANDROID.
+    internal static MainWindow CreateEmbedded(Control host)
+    {
+        var w = new MainWindow();
+        var src = w.FindControl<Grid>("Root");
+        var dst = host.FindControl<Grid>("Root");
+        if (src?.Parent is Panel old && dst != null)
+        {
+            foreach (var child in src.Children.ToList())
+            {
+                old.Children.Remove(child);
+                dst.Children.Add(child);
+            }
+        }
+        w.InitialBoot();
+        return w;
+    }
+#endif
+
     // ---------------------------------------------------------------- build
     private void BuildWindow()
     {

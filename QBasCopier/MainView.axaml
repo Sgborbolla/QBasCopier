@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:QBasCopier"
+             x:Class="QBasCopier.MainView"
+             Background="{DynamicResource BgBase}">
+    <Panel>
+        <Grid x:Name="Root" Margin="2"/>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
+                    IsHitTestVisible="False" Spacing="8">
+            <TextBlock Text="QBasCopier&amp;Transfer" FontSize="120" FontWeight="Bold"
+                       Foreground="{DynamicResource Water}"
+                       HorizontalAlignment="Center"/>
+            <TextBlock Text="Asociado con Freeman y Diseños" FontSize="26"
+                       Foreground="{DynamicResource Water}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+        <TextBlock Text="QBasCopier&amp;Transfer · © 2026 · Asociado con Freeman y Diseños"
+                   FontSize="15" Foreground="{DynamicResource Water}"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,6"
+                   IsHitTestVisible="False"/>
+    </Panel>
+</UserControl>

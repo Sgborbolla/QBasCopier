@@ -30,6 +30,17 @@ public partial class App : Application
                 w.InitialBoot();
                 CrashLog.Info("InitialBoot done");
             }
+#if ANDROID
+            else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+            {
+                // En Android el lifetime es un SingleViewLifetime y la activity hace
+                // SetContentView(lifetime.MainView). Sin esto no hay nada que mostrar:
+                // lienzo blanco, sin crash. Es lo que pasaba.
+                CrashLog.Info("creating MainView (Android)");
+                singleView.MainView = new MainView();
+                CrashLog.Info("MainView assigned");
+            }
+#endif
         }
         catch (Exception ex)
         {
@@ -48,8 +59,18 @@ public partial class App : Application
                 Text = ex.ToString(),
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = Brushes.White,
+                Background = Brushes.DarkSlateGray,
                 Margin = new Thickness(12)
             };
+#if ANDROID
+            // En Android una Window nueva no se muestra: hay que poner el error en el
+            // MainView, si no vuelve a quedar una pantalla en blanco sin explicacion.
+            if (Application.Current?.ApplicationLifetime is ISingleViewApplicationLifetime sv)
+            {
+                sv.MainView = new ScrollViewer { Content = tb };
+                return;
+            }
+#endif
             var win = new Window
             {
                 Title = "QBasCopier - ERROR de arranque",
