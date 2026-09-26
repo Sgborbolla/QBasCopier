@@ -218,7 +218,11 @@ public static class DroidDir
         return rel;
     }
 
-    /// <summary>Borra un documento SAF. Necesario para "mover" desde el explorador.</summary>
+    /// <summary>
+    /// Borra un documento SAF. Necesario para "mover" desde el explorador.
+    /// DocumentsContract.RemoveDocument exige tambien el padre, que se deduce de la docId
+    /// ("primary:Download/foto.jpg" -> "primary:Download").
+    /// </summary>
     public static bool Delete(string uri)
     {
         try
@@ -227,7 +231,14 @@ public static class DroidDir
             if (cr == null) return false;
             var u = global::Android.Net.Uri.Parse(uri);
             if (u == null) return false;
-            return global::Android.Provider.DocumentsContract.RemoveDocument(cr, u);
+            try { if (cr.Delete(u, null, null) > 0) return true; } catch { }
+            var id = global::Android.Provider.DocumentsContract.GetDocumentId(u);
+            if (string.IsNullOrEmpty(id)) return false;
+            int i = id.LastIndexOf('/');
+            if (i <= 0) return false;
+            var parent = global::Android.Provider.DocumentsContract.BuildDocumentUri(
+                u.Authority ?? "", id[..i]);
+            return global::Android.Provider.DocumentsContract.RemoveDocument(cr, parent, u);
         }
         catch { return false; }
     }
@@ -528,10 +539,12 @@ public class MainActivity : AvaloniaMainActivity<App>
             if (_pm == null) return;
             if (_wake == null)
             {
-                _wake = _pm.NewWakeLock(PowerManager.PartialWakeLock, "QBasCopier:transfer");
+                // 1 = PARTIAL_WAKE_LOCK. Se usa el literal porque el nombre simbolico
+                // no existe en el binding de .NET para Android.
+                _wake = _pm.NewWakeLock(1, "QBasCopier:transfer");
                 _wake.SetReferenceCounted(false);
             }
-            if (!_wake.IsHeld) _wake.Acquire(TimeSpan.FromMinutes(6 * 60));
+            if (!_wake.IsHeld) _wake.Acquire(6L * 60 * 60 * 1000);   // 6 h
         }
         catch { }
     }

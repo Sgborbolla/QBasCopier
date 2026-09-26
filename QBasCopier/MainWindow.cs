@@ -1659,7 +1659,6 @@ public sealed partial class MainWindow : UserControl
         var root = this.FindControl<Grid>("Root");
         if (root == null) { tcs.TrySetResult(default); return tcs.Task; }
         var layer = new Grid { Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)) };
-        _overlay = new TaskCompletionSource<bool>();
         var card = new Border
         {
             Background = BgPanel, BorderBrush = Line, BorderThickness = new Thickness(1),
