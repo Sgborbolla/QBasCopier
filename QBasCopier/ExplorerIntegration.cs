@@ -32,11 +32,11 @@ public static class ExplorerIntegration
     public static void Install()
     {
         using var hkcu = Registry.CurrentUser;
-        SetVerb(hkcu, KeyFiles, "Copiar con QBasCopier&Transfer", "--copy -- \"%1\"");
-        SetVerb(hkcu, KeyFilesMove, "Mover con QBasCopier&Transfer", "--move -- \"%1\"");
-        SetVerb(hkcu, KeyDir, "Copiar con QBasCopier&Transfer", "--copy -- \"%1\"");
-        SetVerb(hkcu, KeyDirMove, "Mover con QBasCopier&Transfer", "--move -- \"%1\"");
-        SetVerb(hkcu, KeyBg, "Copiar aquí con QBasCopier&Transfer…", "--copy -- \"%V\"");
+        SetVerb(hkcu, KeyFiles, "Copiar con QBasCopier y Transfer", "--copy -- \"%1\"");
+        SetVerb(hkcu, KeyFilesMove, "Mover con QBasCopier y Transfer", "--move -- \"%1\"");
+        SetVerb(hkcu, KeyDir, "Copiar con QBasCopier y Transfer", "--copy -- \"%1\"");
+        SetVerb(hkcu, KeyDirMove, "Mover con QBasCopier y Transfer", "--move -- \"%1\"");
+        SetVerb(hkcu, KeyBg, "Copiar aquí con QBasCopier y Transfer…", "--copy -- \"%V\"");
 
         CreateSendTo();
     }
@@ -49,7 +49,7 @@ public static class ExplorerIntegration
         try
         {
             var sendTo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\SendTo");
-            var lnk = Path.Combine(sendTo, "QBasCopier&Transfer.lnk");
+            var lnk = Path.Combine(sendTo, "QBasCopier-y-Transfer.lnk");
             if (File.Exists(lnk)) File.Delete(lnk);
         }
         catch { }
@@ -70,7 +70,7 @@ public static class ExplorerIntegration
         {
             var sendTo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\SendTo");
             Directory.CreateDirectory(sendTo);
-            var lnk = Path.Combine(sendTo, "QBasCopier&Transfer.lnk");
+            var lnk = Path.Combine(sendTo, "QBasCopier-y-Transfer.lnk");
             if (File.Exists(lnk)) return;
             var t = Type.GetTypeFromProgID("WScript.Shell");
             if (t == null) return;
@@ -79,7 +79,7 @@ public static class ExplorerIntegration
             sc.TargetPath = ExePath;
             sc.Arguments = "--copy -- \"%1\""; // SendTo rellena los archivos seleccionados
             sc.IconLocation = $"{ExePath},0";
-            sc.Description = "Copiar con QBasCopier&Transfer";
+            sc.Description = "Copiar con QBasCopier y Transfer";
             sc.Save();
         }
         catch { }
@@ -90,8 +90,8 @@ public static class ExplorerIntegration
         try
         {
             using var rk = Registry.CurrentUser.OpenSubKey(RunKey, true);
-            if (on) rk?.SetValue("QBasCopier&Transfer", $"\"{ExePath}\" --hidden");
-            else rk?.DeleteValue("QBasCopier&Transfer", false);
+            if (on) rk?.SetValue("QBasCopier y Transfer", $"\"{ExePath}\" --hidden");
+            else rk?.DeleteValue("QBasCopier y Transfer", false);
         }
         catch { }
     }

@@ -26,7 +26,7 @@
     intent-filter MAIN/LAUNCHER. Declararlos aqui creaba Activities fantasma
     (com.qbaswing.qbascopier.MainActivity) apuntando a clases inexistentes.
   -->
-  <application android:label="QBasCopier&amp;Transfer"
+  <application android:label="QBasCopier y Transfer"
                android:theme="@style/MyTheme"
                android:icon="@mipmap/ic_launcher"
                android:roundIcon="@mipmap/ic_launcher_round"

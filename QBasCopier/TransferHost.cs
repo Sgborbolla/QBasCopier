@@ -213,7 +213,7 @@ public sealed class TransferHost : IDisposable
                     if (await ServeGetAsync(ns, path, query, method == "HEAD")) return;
                 }
 
-                await WriteTextAsync(ns, "QBasCopier&Transfer listo");
+                await WriteTextAsync(ns, "QBasCopier y Transfer listo");
             }
         }
         catch { }
@@ -302,7 +302,7 @@ public sealed class TransferHost : IDisposable
             {
                 var items = ListEntries(Inbox, 0);
                 var sb = new StringBuilder();
-                sb.Append("{\"app\":\"QBasCopier&Transfer\",\"inbox\":\"").Append(JsonStr(Inbox)).Append("\",\"files\":[");
+                sb.Append("{\"app\":\"QBasCopier y Transfer\",\"inbox\":\"").Append(JsonStr(Inbox)).Append("\",\"files\":[");
                 for (int i = 0; i < items.Count; i++)
                 {
                     if (i > 0) sb.Append(',');
@@ -335,14 +335,14 @@ public sealed class TransferHost : IDisposable
         var sb = new StringBuilder();
         sb.Append("<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">")
           .Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-          .Append("<title>QBasCopier&amp;Transfer</title><style>")
+          .Append("<title>QBasCopier y Transfer</title><style>")
           .Append("body{font-family:system-ui,sans-serif;background:#eaf2ff;color:#0d1b3e;margin:0;padding:16px}")
           .Append("h1{font-size:19px;margin:0 0 4px}p{font-size:13px;margin:4px 0 14px}")
           .Append("table{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden}")
           .Append("th,td{font-size:13px;padding:8px 10px;border-bottom:1px solid #d3e0ff;text-align:left}")
           .Append("a{color:#0b3ea8}input,button{font-size:14px;padding:8px;border-radius:8px;border:1px solid #b9cdf5}")
           .Append("</style></head><body>");
-        sb.Append("<h1>QBasCopier&amp;Transfer</h1>");
+        sb.Append("<h1>QBasCopier y Transfer</h1>");
         sb.Append("<p>Equipo: <b>").Append(Html(DeviceName)).Append("</b> &middot; recibidos en: <b>").Append(Html(Inbox)).Append("</b></p>");
         sb.Append("<p>Enviar archivos: el&iacute;ge un archivo y pulsa <b>Enviar</b>. Autom&aacute;ticamente se guarda en la carpeta de recibidos de la otra m&aacute;quina.</p>");
         sb.Append("<form id=f><input type=file id=i multiple><button type=button onclick=go()>Enviar</button></form><p id=s></p>");

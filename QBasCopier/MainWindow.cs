@@ -73,7 +73,7 @@ public sealed partial class MainWindow : UserControl
 
     private const string TabExplorer = "explorer", TabQueue = "queue", TabErrors = "errors", TabOptions = "options", TabHistory = "history", TabTransfer = "transfer";
     private const string AboutText =
-        "QBasCopier&Transfer crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
+        "QBasCopier y Transfer crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
         "que nació de las manos del Dr. Sergio Grabiel Borbolla Verdecia. Desde Cuba, con el corazón " +
         "lleno de amor por la medicina y por el mundo digital, cada línea se escribe con esfuerzo y " +
         "esperanza, aunque a veces la tecnología no alcance.\n\n" +
@@ -85,7 +85,7 @@ public sealed partial class MainWindow : UserControl
         "Este es un pequeño homenaje a la idea de que con dedicación se cumplen sueños y se entregan " +
         "al mundo obras útiles y hermosas. Gracias por formar parte de él.\n\n— SGBV";
 
-    // ---------------------- Transferir (QBasCopier&Transfer) ----------------------
+    // ---------------------- Transferir (QBasCopier y Transfer) ----------------------
     private readonly TransferHost _trSrv = new();
     private CheckBox? _trToggle;
     private Image? _trImg;
@@ -344,7 +344,7 @@ public sealed partial class MainWindow : UserControl
     private string MakeQrText()
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("QBasCopier&Transfer");
+        sb.AppendLine("QBasCopier y Transfer");
         sb.AppendLine("Red: " + S.TransferNet);
         sb.AppendLine("Clave: " + S.TransferKey);
         sb.AppendLine("WIFI:T:WPA;S:" + S.TransferNet + ";P:" + S.TransferKey + ";;");
@@ -514,7 +514,7 @@ public sealed partial class MainWindow : UserControl
         var url = "";
         foreach (var line in txt.Split('\n'))
             if (line.Trim().StartsWith("http", StringComparison.OrdinalIgnoreCase)) { url = line.Trim(); break; }
-        if (url.Length == 0) { _lblStatus.Text = "QR no válido para QBasCopier&Transfer."; return; }
+        if (url.Length == 0) { _lblStatus.Text = "QR no válido para QBasCopier y Transfer."; return; }
         ConnectBase(url.TrimEnd('/') + "/");
     }
 
@@ -535,7 +535,7 @@ public sealed partial class MainWindow : UserControl
             catch { txt = ""; }
             DispatchUi(() =>
             {
-                if (txt.Contains("QBasCopier&Transfer"))
+                if (txt.Contains("QBasCopier y Transfer"))
                 {
                     _lblStatus.Text = "Conectado a: " + baseUrl;
                     if (_trStatus != null) _trStatus.Text = "Conectado a: " + baseUrl;
@@ -769,16 +769,30 @@ public sealed partial class MainWindow : UserControl
 
     private Control BuildToolbar()
     {
+        // La marca ocupa una columna Star con recorte: antes iba en Auto y en un movil de
+        // 360 dp empujaba el desplegable de idioma y los botones fuera de la pantalla,
+        // que era como se perdia el acceso a la pestana Transferir.
         var bar = new Grid
         {
-            ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) },
+            ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) },
             Margin = new Thickness(8, 4)
         };
-        var brand = new TextBlock { Text = "QBasCopier&Transfer", FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0) };
+        var brand = new TextBlock
+        {
+            Text = "QBasCopier y Transfer", FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold,
+            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis, ClipToBounds = true
+        };
         Grid.SetColumn(brand, 0);
         bar.Children.Add(brand);
 
-        _cmbLangQuick = new ComboBox { ItemsSource = Ex.LangNames(), SelectedIndex = Ex.IndexOf(S.Lang), Width = 170, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) };
+        _cmbLangQuick = new ComboBox
+        {
+            ItemsSource = Ex.LangNames(), SelectedIndex = Ex.IndexOf(S.Lang),
+            MinWidth = 70, MaxWidth = 170, Width = 170,
+            HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0)
+        };
         _cmbLangQuick.SelectionChanged += (s, e) => { if (Ex.Codes.Length > (s as ComboBox)?.SelectedIndex) ApplyLang(Ex.Codes[((ComboBox)s!).SelectedIndex]); };
         Grid.SetColumn(_cmbLangQuick, 1);
         bar.Children.Add(_cmbLangQuick);
@@ -796,6 +810,19 @@ public sealed partial class MainWindow : UserControl
         _bQuit = bQuit;
         Grid.SetColumn(bQuit, 4);
         bar.Children.Add(bQuit);
+
+        // En pantallas estrechas el desplegable de idioma se encoge en vez de empujar
+        // los botones fuera de la vista.
+        bar.SizeChanged += (_, e) =>
+        {
+            var w = e.NewSize.Width;
+            if (w <= 0) return;
+            var tight = w < 620;
+            _cmbLangQuick.Width = tight ? 92 : 170;
+            _cmbLangQuick.FontSize = tight ? 12 : 13;
+            brand.TextTrimming = tight ? TextTrimming.CharacterEllipsis : TextTrimming.None;
+        };
+
         return bar;
     }
 
@@ -803,6 +830,9 @@ public sealed partial class MainWindow : UserControl
     {
         var body = new Grid { RowDefinitions = { new(GridLength.Star) }, Margin = new Thickness(4, 2, 4, 2) };
         _tabs = new TabControl();
+        // A 360 dp seis cabeceras completas no caben y la ultima (Transferir) quedaba
+        // fuera de pantalla sin forma de alcanzarla.
+        _tabs.Classes.Add("tabsCompact");
         _tabs.Items.Add(MkTab(TabExplorer, BuildExplorerTab()));
         _tabs.Items.Add(MkTab(TabQueue, BuildQueueBody()));
         _tabs.Items.Add(MkTab(TabErrors, MakeErrBody()));
@@ -1158,7 +1188,7 @@ public sealed partial class MainWindow : UserControl
         col.Children.Add(bottom);
 
         var about = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
-        var aboutT = MkLbl("Acerca de QBasCopier&Transfer", 13);
+        var aboutT = MkLbl("Acerca de QBasCopier y Transfer", 13);
         aboutT.FontWeight = FontWeight.Bold;
         aboutT.Foreground = Gold;
         about.Children.Add(aboutT);
@@ -1226,7 +1256,7 @@ public sealed partial class MainWindow : UserControl
     private Control BuildStatusbar()
     {
         var bar = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, Margin = new Thickness(8, 0, 8, 3) };
-        _lblStatus = MkLbl("QBasCopier&Transfer 1.0.0", 12);
+        _lblStatus = MkLbl("QBasCopier y Transfer 1.2.0", 12);
         Grid.SetColumn(_lblStatus, 0);
         bar.Children.Add(_lblStatus);
         var ver = MkLbl("© 2026", 12);
@@ -1401,14 +1431,14 @@ public sealed partial class MainWindow : UserControl
             _miniLbl.Text = _lblProg.Text + "  " + _lblRate.Text;
             _miniBar.Value = pct;
             #if !ANDROID
-            if (S.ShowInTitle && Host != null) Host.Title = $"QBasCopier&Transfer · {pct:0.#}%";
+            if (S.ShowInTitle && Host != null) Host.Title = $"QBasCopier y Transfer · {pct:0.#}%";
 #endif
         }
         else
         {
             _lastTickTicks = 0;
 #if !ANDROID
-            if (S.ShowInTitle && Host != null) Host.Title = "QBasCopier&Transfer";
+            if (S.ShowInTitle && Host != null) Host.Title = "QBasCopier y Transfer";
 #endif
         }
 
@@ -1774,9 +1804,9 @@ public sealed partial class MainWindow : UserControl
         {
             if (_tray != null) { _tray.IsVisible = false; _tray.Dispose(); _tray = null; }
             if (!S.TrayIcon || _logoBmp == null) return;
-            _tray = new TrayIcon { Icon = new WindowIcon(_logoBmp), ToolTipText = "QBasCopier&Transfer", IsVisible = true };
+            _tray = new TrayIcon { Icon = new WindowIcon(_logoBmp), ToolTipText = "QBasCopier y Transfer", IsVisible = true };
             _tray.Menu = new NativeMenu();
-            var mOpen = new NativeMenuItem("QBasCopier&Transfer");
+            var mOpen = new NativeMenuItem("QBasCopier y Transfer");
             mOpen.Click += (s, e) => { Show(); Activate(); };
             var mQuit = new NativeMenuItem(L.Get("quit"));
             mQuit.Click += (s, e) => DoQuit();

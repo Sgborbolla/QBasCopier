@@ -12,7 +12,7 @@ public sealed class DesktopWindow : Window
 {
     public DesktopWindow()
     {
-        Title = "QBasCopier&Transfer";
+        Title = "QBasCopier y Transfer";
         SystemDecorations = SystemDecorations.Full;
         Width = 1220; Height = 760;
         MinWidth = 900; MinHeight = 520;

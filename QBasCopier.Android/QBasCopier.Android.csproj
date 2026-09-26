@@ -6,8 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.qbaswing.qbascopier</ApplicationId>
-    <ApplicationVersion>2</ApplicationVersion>
-    <ApplicationDisplayVersion>1.1</ApplicationDisplayVersion>
+    <ApplicationVersion>3</ApplicationVersion>
+    <ApplicationDisplayVersion>1.2</ApplicationDisplayVersion>
     <RootNamespace>QBasCopier</RootNamespace>
     <AssemblyName>QBasCopier</AssemblyName>
     <AndroidManifest>Properties/AndroidManifest.xml</AndroidManifest>

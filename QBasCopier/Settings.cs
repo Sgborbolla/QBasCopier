@@ -46,7 +46,7 @@ public sealed class Settings
     public bool SaveLog { get; set; }
     public long DiskWarnMb { get; set; }
 
-    // Transferir (QBasCopier&Transfer)
+    // Transferir (QBasCopier y Transfer)
     public bool TransferOn { get; set; }
     public int TransferPort { get; set; } = 9527;
     public string TransferNet { get; set; } = "QBasWing-Transfer";

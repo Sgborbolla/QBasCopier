@@ -10,14 +10,14 @@
         <Grid x:Name="Root" Margin="2"/>
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
                     IsHitTestVisible="False" Spacing="8">
-            <TextBlock x:Name="Watermark" Text="QBasCopier&amp;Transfer" FontSize="120" FontWeight="Bold"
+            <TextBlock x:Name="Watermark" Text="QBasCopier y Transfer" FontSize="120" FontWeight="Bold"
                        Foreground="{DynamicResource Water}"
                        HorizontalAlignment="Center"/>
             <TextBlock Text="Asociado con Freeman y Diseños" FontSize="26"
                        Foreground="{DynamicResource Water}"
                        HorizontalAlignment="Center"/>
         </StackPanel>
-        <TextBlock x:Name="WaterFooter" Text="QBasCopier&amp;Transfer · © 2026 · Asociado con Freeman y Diseños"
+        <TextBlock x:Name="WaterFooter" Text="QBasCopier y Transfer · © 2026 · Asociado con Freeman y Diseños"
                    FontSize="15" Foreground="{DynamicResource Water}"
                    HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,6"
                    IsHitTestVisible="False"/>

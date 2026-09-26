@@ -490,7 +490,7 @@ public static class DroidCtx
     }
 }
 
-[Activity(Label = "QBasCopier&Transfer", MainLauncher = true, Theme = "@style/MyTheme",
+[Activity(Label = "QBasCopier y Transfer", MainLauncher = true, Theme = "@style/MyTheme",
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.Density)]
 public class MainActivity : AvaloniaMainActivity<App>
 {

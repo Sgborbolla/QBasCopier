@@ -42,7 +42,7 @@ jobs:
       - name: Subir el APK como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: QBasCopier&Transfer-v1.1-apk
+          name: QBasCopier-y-Transfer-v1.2-apk
           path: QBasCopier.Android/bin/Release/net8.0-android*/*.apk
           if-no-files-found: error
 
@@ -52,9 +52,9 @@ jobs:
         run: |
           set -e
           apk=$(ls QBasCopier.Android/bin/Release/net8.0-android*/*.apk | head -1)
-          # GitHub convierte el "&" en "." en el nombre de un asset de release
-          # (probado por API), asi que ahi va con guion. El archivo local si
-          # lleva el ampersand: build-android.sh deja dist/QBasCopier&Transfer-v1.1.apk
-          cp "$apk" "QBasCopier-Transfer-v1.1.apk"
-          gh release delete v1.1-apk --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create v1.1-apk "QBasCopier-Transfer-v1.1.apk" --title "QBasCopier&Transfer 1.1" --notes "Version Android para celular. Compilada con GitHub Actions."
+          # El nombre ya no lleva "&" (lo convertia GitHub en "." al publicar el
+          # asset), asi que el archivo de release y el local son el mismo:
+          # QBasCopier-y-Transfer-v1.2.apk
+          cp "$apk" "QBasCopier-y-Transfer-v1.2.apk"
+          gh release delete v1.2-apk --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create v1.2-apk "QBasCopier-y-Transfer-v1.2.apk" --title "QBasCopier y Transfer 1.2" --notes "Version Android para celular. Compilada con GitHub Actions."
