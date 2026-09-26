@@ -109,7 +109,7 @@ public sealed class Settings
     public void SaveSoon()
     {
         _pending = this;
-        try { _debounce.Change(600, System.Threading.Timeout.InfiniteTimeSpan); } catch { }
+        try { _debounce.Change(TimeSpan.FromMilliseconds(600), System.Threading.Timeout.InfiniteTimeSpan); } catch { }
     }
 
     /// <summary>Fuerza la escritura de lo pendiente (al cerrar la app).</summary>
