@@ -133,6 +133,36 @@ public sealed partial class MainWindow : UserControl
         Discovery.Changed += () => DispatchUi(FillPeers);
     }
 
+    /// <summary>
+    /// La clave de emparejamiento ahora se comprueba de verdad en el servidor, asi que
+    /// hay que publicarla antes de arrancar a escuchar.
+    /// </summary>
+    private void ApplyTransferKey()
+    {
+        var k = (S.TransferKey ?? "").Trim();
+        TransferHost.Key = k;
+        TransferClient.Key = k;
+        TransferHost.DeviceName = S.DeviceName ?? "";
+    }
+
+    /// <summary>
+    /// Boton atras de Android. Antes salia de la app directamente desde cualquier
+    /// pantalla, y con un dialogo de colision abierto se cerraba la app a medias.
+    /// Devuelve true si el evento quedo consumido.
+    /// </summary>
+    private bool HandleBack()
+    {
+        if (_overlayClose != null)
+        {
+            // Cerrar el dialogo sin decidir: se vuelve a preguntar, no se cuelga la copia.
+            _overlayClose();
+            return true;
+        }
+        if (_running) { _lblStatus.Text = L.Get("busy"); return true; }
+        if (_tabs != null && _tabs.SelectedIndex > 0) { _tabs.SelectedIndex = 0; return true; }
+        return false;
+    }
+
     private static string DeviceNameOrHost()
     {
         try { return (string.IsNullOrWhiteSpace(TransferHost.DeviceName) ? Environment.MachineName : TransferHost.DeviceName); }
@@ -141,13 +171,12 @@ public sealed partial class MainWindow : UserControl
 
     private void ToggleTr(bool on)
     {
-        S.TransferOn = on; S.Save();
         if (on)
         {
             var inbox = S.TransferInbox;
             if (string.IsNullOrWhiteSpace(inbox)) inbox = TransferDefaultInbox();
             S.TransferInbox = inbox;
-            try { Directory.CreateDirectory(inbox); } catch { }
+            if (!CopyEngine.IsSafPath(inbox)) { try { Directory.CreateDirectory(inbox); } catch { } }
             _trSrv.Start(S.TransferPort, inbox);
             Discovery.Start(DevName, S.TransferPort);
             _lblStatus.Text = "Modo Transferir activado. Muestra el QR o busca dispositivos.";
@@ -163,6 +192,10 @@ public sealed partial class MainWindow : UserControl
             FillPeers();
             _lblStatus.Text = "Modo Transferir apagado.";
         }
+        // El unico Save() va al final: antes se guardaba TransferOn antes de decidir el
+        // inbox, y el inbox nunca llegaba al disco.
+        S.TransferOn = on;
+        S.Save();
         RefreshTrUi();
     }
 
@@ -171,7 +204,18 @@ public sealed partial class MainWindow : UserControl
         try
         {
             if (OperatingSystem.IsAndroid())
-                return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Recibidos");
+            {
+                // SpecialFolder.ApplicationData en Android no es una ruta escribible de
+                // verdad: al recibir, la escritura fallaba y no se guardaba nada.
+                try
+                {
+                    var home = QBasCopier.Android.DroidList.Home();
+                    var dir = System.IO.Path.Combine(home, "Recibidos");
+                    Directory.CreateDirectory(dir);
+                    return dir;
+                }
+                catch { }
+            }
             return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "QBasCopierRecibidos");
         }
         catch { return System.IO.Path.GetTempPath(); }
@@ -661,6 +705,7 @@ public sealed partial class MainWindow : UserControl
 
         ReloadTexts();
         BuildTray();
+        ApplyTransferKey();
         if (paths.Count > 0) AddFiles(paths.ToArray());
         if (!string.IsNullOrEmpty(dest)) _tbTo.Text = dest;
 
@@ -674,6 +719,12 @@ public sealed partial class MainWindow : UserControl
 #if !ANDROID
         Host?.Show();
         Host?.Activate();
+#else
+        // Si se dejo activado, la app lo encendia de nuevo pero la casilla se quedaba
+        // en apagado: la UI mentia sobre lo que realmente estaba haciendo.
+        if (S.TransferOn) { _trToggle.IsChecked = true; ToggleTr(true); }
+        global::QBasCopier.Android.MainActivity.Current?.KeepAwake();
+        global::QBasCopier.Android.MainActivity.BackHandler = HandleBack;
 #endif
         if (paths.Count > 0 && !string.IsNullOrEmpty(dest)) _ = Task.Delay(120).ContinueWith(_ => Dispatcher.UIThread.Post(() => _ = StartCopy(move)));
     }
@@ -1496,16 +1547,21 @@ public sealed partial class MainWindow : UserControl
             _lblStatus.Text = L.Get("destination") + "?";
             return;
         }
-        try { Directory.CreateDirectory(dest); } catch { _lblStatus.Text = L.Get("errTitle"); return; }
+        bool safDest = CopyEngine.IsSafPath(dest);
+        if (!safDest)
+        {
+            // Con un destino content:// esto siempre fallaba y la copia no arrancaba nunca.
+            try { Directory.CreateDirectory(dest); }
+            catch { _lblStatus.Text = L.Get("errTitle"); return; }
+        }
 
-        if (S.DiskWarnMb > 0)
+        if (S.DiskWarnMb > 0 && !safDest)
         {
             try
             {
                 long needed = 0;
                 foreach (var q in _queue)
-                    if (!q.IsDirectory && File.Exists(q.SourcePath))
-                        needed += new FileInfo(q.SourcePath).Length;
+                    if (!q.IsDirectory && !q.IsContent) needed += SourceSizeOf(q);
                 var drv = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(dest).TrimEnd('/', '\\')) ?? dest);
                 if (drv.AvailableFreeSpace - needed < S.DiskWarnMb * 1024L * 1024L)
                     _lblStatus.Text = Ex.Get("warnSpace");
@@ -1524,7 +1580,10 @@ public sealed partial class MainWindow : UserControl
         RefreshQueueUi();
 
         foreach (var it in _queue)
-            it.DestPath = Path.Combine(dest, Path.GetFileName(it.SourcePath.TrimEnd('/', '\\')));
+        {
+            it.DestDir = dest;
+            it.Rel = it.Name;
+        }
 
         _engine.Move = move;
         _batchSw.Restart();
@@ -1532,6 +1591,9 @@ public sealed partial class MainWindow : UserControl
         _lastRate = 0;
         _lastTickTicks = 0;
         _running = true;
+#if ANDROID
+        QBasCopier.Android.MainActivity.Current?.KeepAwake();
+#endif
         _bCopy.IsEnabled = _bMove.IsEnabled = false;
         _bPause.IsEnabled = true;
         _bResume.IsEnabled = false;
@@ -1546,6 +1608,15 @@ public sealed partial class MainWindow : UserControl
         _bPause.IsEnabled = _bResume.IsEnabled = false;
         _bSkip.IsEnabled = _bCancel.IsEnabled = false;
         _lblStatus.Text = L.Get("done");
+#if ANDROID
+        QBasCopier.Android.MainActivity.Current?.ReleaseLocks();
+#endif
+    }
+
+    private static long SourceSizeOf(CopyItem q)
+    {
+        try { return q.IsDirectory ? 0 : new FileInfo(q.SourcePath).Length; }
+        catch { return 0; }
     }
 
     private async void OnBatchEnd(int ok, int err, bool cancelled)
@@ -1564,6 +1635,10 @@ public sealed partial class MainWindow : UserControl
         try { Settings.Flush(); S.Save(); } catch { }
 #if !ANDROID
         Host?.Close();
+#else
+        // Al ser MainWindow un UserControl ya no hay Window.Close(): sin esto, la opcion
+        // "cerrar al terminar" no hacia nada y la app seguia abierta.
+        QBasCopier.Android.MainActivity.Current?.FinishApp();
 #endif
     }
 
@@ -1572,6 +1647,9 @@ public sealed partial class MainWindow : UserControl
     // (WindowingPlatformStub.CreateWindow lanza NotSupportedException), asi que se
     // superponen sobre la propia UI. Sin esto la copia se queda esperando para siempre
     // en la primera colision o el primer error, porque el await nunca se completa.
+    /// <summary>Cerrar el dialogo abierto en Android. Lo usa el boton atras. Null en escritorio.</summary>
+    private Action? _overlayClose;
+
     private Task<T?> AskAsync<T>(string title, int width, int height, Func<Action<T?>, Control> build)
     {
 #if ANDROID
@@ -1579,6 +1657,7 @@ public sealed partial class MainWindow : UserControl
         var root = this.FindControl<Grid>("Root");
         if (root == null) { tcs.TrySetResult(default); return tcs.Task; }
         var layer = new Grid { Background = new SolidColorBrush(Color.FromArgb(170, 0, 0, 0)) };
+        _overlay = new TaskCompletionSource<bool>();
         var card = new Border
         {
             Background = BgPanel, BorderBrush = Line, BorderThickness = new Thickness(1),
@@ -1588,7 +1667,16 @@ public sealed partial class MainWindow : UserControl
         };
         layer.Children.Add(card);
         root.Children.Add(layer);
-        card.Child = build(v => { root.Children.Remove(layer); tcs.TrySetResult(v); });
+        Action close = () =>
+        {
+            root.Children.Remove(layer);
+            _overlayClose = null;
+            // Cerrar sin decidir deja la tarea en default, que es lo que el motor
+            // interpreta como "el usuario no eligio": vuelve a preguntar.
+            tcs.TrySetResult(default);
+        };
+        card.Child = build(v => { root.Children.Remove(layer); _overlayClose = null; tcs.TrySetResult(v); });
+        _overlayClose = close;
         return tcs.Task;
 #else
         var win = new Window

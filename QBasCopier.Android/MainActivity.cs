@@ -45,54 +45,53 @@ public static class DroidFile
     public static Stream Open(string uri)
     {
         var cr = MainActivity.Current?.ContentResolver;
-        if (cr == null) return Stream.Null;
+        if (cr == null) throw new IOException("ContentResolver no disponible");
         try
         {
             var u = global::Android.Net.Uri.Parse(uri);
-            return u == null ? Stream.Null : (cr.OpenInputStream(u) ?? Stream.Null);
+            if (u == null) throw new IOException("URI invalida: " + uri);
+            var s = cr.OpenInputStream(u);
+            // Antes se devolvia Stream.Null: la copia terminaba "bien" con 0 bytes copiados.
+            if (s == null) throw new IOException("No se pudo abrir: " + uri);
+            return s;
         }
-        catch { return Stream.Null; }
+        catch (IOException) { throw; }
+        catch (Exception ex) { throw new IOException("No se pudo abrir: " + uri, ex); }
     }
+
+    /// <summary>Nombre visible del documento. Nunca devuelve la docId codificada.</summary>
+    public static string Name(string uri) => Info(uri).Name;
 }
 
 public static class DroidDir
 {
-    public static Stream? OpenForWrite(string treeUri, string fileName)
+    const string MimeDir = "vnd.android.document/directory";
+    const string MimeBin = "application/octet-stream";
+
+    /// <summary>
+    /// Crea un archivo NUEVO dentro de la carpeta SAF con el primer nombre libre
+    /// ("foto.jpg", "foto (1).jpg"...). Se usa al recibir por transferencia: nunca se
+    /// debe pisar un archivo que ya estaba.
+    /// </summary>
+    public static Stream? OpenForWrite(string dirUri, string fileName)
     {
         try
         {
             var cr = MainActivity.Current?.ContentResolver;
             if (cr == null) return null;
-            var tu = global::Android.Net.Uri.Parse(treeUri);
-            if (tu == null) return null;
-            var doc = global::Android.Provider.DocumentsContract.CreateDocument(
-                cr, tu, "application/octet-stream", fileName);
+            var pu = global::Android.Net.Uri.Parse(dirUri);
+            if (pu == null) return null;
+            var free = NextFreeName(dirUri, fileName);
+            var doc = global::Android.Provider.DocumentsContract.CreateDocument(cr, pu, MimeBin, free);
             if (doc == null) return null;
-            return cr.OpenOutputStream(doc);
+            return cr.OpenOutputStream(doc, "wt");
         }
         catch { return null; }
     }
 
-    public static string SaveToTree(string treeUri, string fileName, Stream src)
-    {
-        try
-        {
-            var cr = MainActivity.Current?.ContentResolver;
-            if (cr == null) return "";
-            var tu = global::Android.Net.Uri.Parse(treeUri);
-            if (tu == null) return "";
-            var doc = global::Android.Provider.DocumentsContract.CreateDocument(
-                cr, tu, "application/octet-stream", fileName);
-            if (doc == null) return "";
-            using var os = cr.OpenOutputStream(doc);
-            src.CopyTo(os);
-            return fileName;
-        }
-        catch { return ""; }
-    }
     /// <summary>
     /// Abre un archivo dentro de una carpeta SAF para escritura, sobrescribiendo si ya existe.
-    /// DocumentsContract.CreateDocument siempre crea uno nuevo (y el explorador le anade
+    /// DocumentsContract.CreateDocument SIEMPRE crea uno nuevo (y el explorador le anade
     /// " (1)" al nombre), asi que primero se busca el documento con ese nombre.
     /// </summary>
     public static Stream? OpenForWriteIn(string dirUri, string fileName)
@@ -103,37 +102,149 @@ public static class DroidDir
             if (cr == null) return null;
             var pu = global::Android.Net.Uri.Parse(dirUri);
             if (pu == null) return null;
-            var treeId = global::Android.Provider.DocumentsContract.GetTreeDocumentId(pu);
-            if (treeId == null) return null;
-
-            var kidsUri = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(pu, treeId);
-            using (var c = cr.Query(kidsUri, null, null, null, null))
-            {
-                if (c != null)
-                {
-                    int ciName = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDisplayName);
-                    int ciId = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDocumentId);
-                    if (ciName >= 0 && ciId >= 0 && c.MoveToFirst())
-                    {
-                        do
-                        {
-                            if (c.GetString(ciName) == fileName)
-                            {
-                                var exist = global::Android.Provider.DocumentsContract.BuildDocumentUri(
-                                    pu.Authority ?? "", c.GetString(ciId) ?? "");
-                                // "wt" = escribe y trunca: sobrescribe el archivo entero.
-                                return cr.OpenOutputStream(exist, "wt");
-                            }
-                        } while (c.MoveToNext());
-                    }
-                }
-            }
-
-            var doc = global::Android.Provider.DocumentsContract.CreateDocument(cr, pu, "application/octet-stream", fileName);
+            var exist = Find(pu, fileName, null);
+            // "wt" = escribe y trunca: sobrescribe el archivo entero.
+            if (exist != null) return cr.OpenOutputStream(exist, "wt");
+            var doc = global::Android.Provider.DocumentsContract.CreateDocument(cr, pu, MimeBin, fileName);
             if (doc == null) return null;
             return cr.OpenOutputStream(doc, "wt");
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// Busca un hijo directo por nombre. mime == null = cualquiera, si no exige ese tipo.
+    /// Devuelve una URI que CONSERVA el segmento /tree/ (BuildDocumentUri lo perderia y la
+    /// carpeta dejaria de poder navegarse).
+    /// </summary>
+    static global::Android.Net.Uri? Find(global::Android.Net.Uri parent, string name, string? mime)
+    {
+        var cr = MainActivity.Current?.ContentResolver;
+        if (cr == null) return null;
+        var treeId = global::Android.Provider.DocumentsContract.GetTreeDocumentId(parent);
+        if (treeId == null) return null;
+        var kids = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(parent, treeId);
+        using var c = cr.Query(kids, null, null, null, null);
+        if (c == null) return null;
+        int iN = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDisplayName);
+        int iM = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnMimeType);
+        int iI = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDocumentId);
+        if (iN < 0 || iI < 0 || !c.MoveToFirst()) return null;
+        do
+        {
+            if (c.GetString(iN) != name) continue;
+            if (mime != null && c.GetString(iM) != mime) continue;
+            return global::Android.Provider.DocumentsContract
+                .BuildDocumentUriUsingTree(parent, c.GetString(iI) ?? "");
+        } while (c.MoveToNext());
+        return null;
+    }
+
+    /// <summary>Carpeta hija existente, o null. No crea nada.</summary>
+    public static string? FindDir(string parentDirUri, string name)
+    {
+        try
+        {
+            var pu = global::Android.Net.Uri.Parse(parentDirUri);
+            if (pu == null) return null;
+            return Find(pu, name, MimeDir)?.ToString();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>Busca la carpeta hija y la crea si falta. SAF no tiene CreateDirectory.</summary>
+    public static string? EnsureDir(string parentDirUri, string name)
+    {
+        var found = FindDir(parentDirUri, name);
+        if (found != null) return found;
+        try
+        {
+            var cr = MainActivity.Current?.ContentResolver;
+            if (cr == null) return null;
+            var pu = global::Android.Net.Uri.Parse(parentDirUri);
+            if (pu == null) return null;
+            var doc = global::Android.Provider.DocumentsContract.CreateDocument(cr, pu, MimeDir, name);
+            return doc?.ToString();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Crea (o reutiliza) la cadena de carpetas <paramref name="rel"/> dentro de dirUri y
+    /// devuelve la URI de la carpeta final. "a/b" -> crea "a" y dentro "b".
+    /// </summary>
+    public static string? EnsurePath(string dirUri, string rel)
+    {
+        var cur = dirUri;
+        foreach (var seg in rel.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var next = EnsureDir(cur, seg);
+            if (next == null) return null;
+            cur = next;
+        }
+        return cur;
+    }
+
+    /// <summary>Existe el archivo (no carpeta) indicado por rel dentro de dirUri.</summary>
+    public static bool FileExistsIn(string dirUri, string rel)
+    {
+        var i = rel.Replace('\\', '/').LastIndexOf('/');
+        var dir = i < 0 ? dirUri : EnsurePath(dirUri, rel.Substring(0, i)) ?? dirUri;
+        var name = i < 0 ? rel : rel.Substring(i + 1);
+        try
+        {
+            var pu = global::Android.Net.Uri.Parse(dir);
+            if (pu == null) return false;
+            return Find(pu, name, null) != null;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Primer nombre libre "archivo (n).ext" dentro de la carpeta SAF.</summary>
+    public static string NextFreeName(string dirUri, string rel)
+    {
+        if (!FileExistsIn(dirUri, rel)) return rel;
+        var i = rel.Replace('\\', '/').LastIndexOf('/');
+        var name = i < 0 ? rel : rel.Substring(i + 1);
+        var dot = name.LastIndexOf('.');
+        var stem = dot > 0 ? name.Substring(0, dot) : name;
+        var ext = dot > 0 ? name.Substring(dot) : "";
+        for (int n = 1; n < 10000; n++)
+        {
+            var cand = $"{stem} ({n}){ext}";
+            var full = i < 0 ? cand : rel.Substring(0, i + 1) + cand;
+            if (!FileExistsIn(dirUri, full)) return full;
+        }
+        return rel;
+    }
+
+    /// <summary>Borra un documento SAF. Necesario para "mover" desde el explorador.</summary>
+    public static bool Delete(string uri)
+    {
+        try
+        {
+            var cr = MainActivity.Current?.ContentResolver;
+            if (cr == null) return false;
+            var u = global::Android.Net.Uri.Parse(uri);
+            if (u == null) return false;
+            return global::Android.Provider.DocumentsContract.RemoveDocument(cr, u);
+        }
+        catch { return false; }
+    }
+
+    public static bool Exists(string uri)
+    {
+        try
+        {
+            var cr = MainActivity.Current?.ContentResolver;
+            if (cr == null) return false;
+            var u = global::Android.Net.Uri.Parse(uri);
+            if (u == null) return false;
+            using var c = cr.Query(u, null, null, null, null);
+            if (c == null) return false;
+            return c.MoveToFirst();
+        }
+        catch { return false; }
     }
 }
 
@@ -192,7 +303,10 @@ public static class DroidList
                 int si = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnSize);
                 if (si >= 0 && !c.IsNull(si)) size = c.GetLong(si);
                 bool isDir = mime == global::Android.Provider.DocumentsContract.Document.MimeTypeDir;
-                var childUri = global::Android.Provider.DocumentsContract.BuildDocumentUri(pu.Authority, docId);
+                // BuildDocumentUriUsingTree, NO BuildDocumentUri: este ultimo genera
+                // content://auth/document/xx, sin el segmento /tree/, y GetTreeDocumentId
+                // devuelve null -> al entrar en la subcarpeta el listado salia vacio.
+                var childUri = global::Android.Provider.DocumentsContract.BuildDocumentUriUsingTree(pu, docId);
                 res.Add((childUri.ToString(), name, isDir, size));
             }
         }
@@ -203,13 +317,17 @@ public static class DroidList
     public static Stream Open(string uri)
     {
         var cr = MainActivity.Current?.ContentResolver;
-        if (cr == null) return Stream.Null;
+        if (cr == null) throw new IOException("ContentResolver no disponible");
         try
         {
             var u = global::Android.Net.Uri.Parse(uri);
-            return u == null ? Stream.Null : (cr.OpenInputStream(u) ?? Stream.Null);
+            if (u == null) throw new IOException("URI invalida: " + uri);
+            var s = cr.OpenInputStream(u);
+            if (s == null) throw new IOException("No se pudo abrir: " + uri);
+            return s;
         }
-        catch { return Stream.Null; }
+        catch (IOException) { throw; }
+        catch (Exception ex) { throw new IOException("No se pudo abrir: " + uri, ex); }
     }
 
     public static void View(string uri)
@@ -231,24 +349,121 @@ public static class DroidList
 
 public static class DroidPub
 {
-    public static void Publish(string filePath)
+    public const string Folder = "QBasRecibidos";
+
+    /// <summary>
+    /// Copia el archivo recibido a Descargas/QBasRecibidos para que sea visible en el
+    /// explorador de archivos y en la galeria. Antes solo funcionaba con rutas del
+    /// sistema de archivos y solo en Android 10+, asi que en practica no hacia nada.
+    /// src puede ser una ruta normal o una content:// de SAF.
+    /// </summary>
+    public static bool Publish(string src)
+    {
+        var cr = MainActivity.Current?.ContentResolver;
+        if (cr == null) return false;
+        var name = SafeName(src);
+        if (name.Length == 0) return false;
+        var isSaf = src.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
+        bool q = global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.Q;
+
+        try
+        {
+            global::Android.Net.Uri? pending = null;
+            if (q)
+            {
+                var col = new ContentValues();
+                col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, name);
+                col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, MimeOf(name));
+                col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath,
+                        global::Android.OS.Environment.DirectoryDownloads + "/" + Folder);
+                col.Put("is_pending", 1);
+                pending = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
+                if (pending == null) return false;
+            }
+            else
+            {
+                var dir = global::Android.OS.Environment.GetExternalStoragePublicDirectory(
+                              global::Android.OS.Environment.DirectoryDownloads) + "/" + Folder;
+                Directory.CreateDirectory(dir);
+                var full = Path.Combine(dir, name);
+                if (File.Exists(full)) File.Delete(full);
+                using (var os = new FileStream(full, FileMode.CreateNew, FileAccess.Write))
+                using (var ins = OpenSource(src, isSaf)) ins.CopyTo(os);
+                return true;
+            }
+
+            try
+            {
+                using (var os = cr.OpenOutputStream(pending!))
+                using (var ins = OpenSource(src, isSaf))
+                    ins.CopyTo(os);
+
+                // Hay que quitar Is_PENDING o el archivo queda invisible para siempre.
+                var done = new ContentValues();
+                done.Put("is_pending", 0);
+                cr.Update(pending!, done, null, null);
+                return true;
+            }
+            catch
+            {
+                try { cr.Delete(pending!, null, null); } catch { }
+                throw;
+            }
+        }
+        catch (Exception)
+        {
+            DroidCtx.Toast("No se pudo guardar en Descargas");
+            return false;
+        }
+    }
+
+    static Stream OpenSource(string src, bool isSaf)
+    {
+        if (isSaf) return DroidList.Open(src);
+        return new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.Read);
+    }
+
+    /// <summary>Nombre visible del origen, sea ruta o content://.</summary>
+    public static string SafeName(string src)
     {
         try
         {
-            var cr = MainActivity.Current?.ContentResolver;
-            if (cr == null) return;
-            var name = Path.GetFileName(filePath);
-            var col = new ContentValues();
-            col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, name);
-            col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, "application/octet-stream");
-            col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, global::Android.OS.Environment.DirectoryDownloads + "/QBasRecibidos");
-            var uri = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
-            if (uri == null) return;
-            using var os = cr.OpenOutputStream(uri);
-            using var rd = new FileStream(filePath, FileMode.Open, FileAccess.Read);
-            rd.CopyTo(os);
+            if (!src.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+            {
+                var n = Path.GetFileName(src.TrimEnd('/', '\\'));
+                return Clean(n);
+            }
+            return Clean(DroidFile.Name(src));
         }
-        catch { }
+        catch { return "recibido.bin"; }
+    }
+
+    static string Clean(string n)
+    {
+        if (string.IsNullOrWhiteSpace(n)) return "recibido.bin";
+        foreach (var bad in new[] { '/', '\\', ':', '*', '?', '"', '<', '>', '|', '\0' })
+            n = n.Replace(bad, '_');
+        return n.Length > 120 ? n[..120] : n;
+    }
+
+    static string MimeOf(string name)
+    {
+        var e = Path.GetExtension(name).ToLowerInvariant();
+        return e switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            ".webp" => "image/webp",
+            ".mp4" => "video/mp4",
+            ".mkv" => "video/x-matroska",
+            ".mp3" => "audio/mpeg",
+            ".wav" => "audio/wav",
+            ".pdf" => "application/pdf",
+            ".txt" => "text/plain",
+            ".zip" => "application/zip",
+            _ => "application/octet-stream"
+        };
     }
 }
 
@@ -270,7 +485,6 @@ public class MainActivity : AvaloniaMainActivity<App>
 {
     public static MainActivity? Current;
     private Action<string[]>? _pickerCb;
-    private Action<string>? _treeCb;
     private static readonly int ReqPick = 1001;
     private static readonly int ReqCam = 1002;
     private static readonly int ReqTree = 1003;
@@ -284,19 +498,61 @@ public class MainActivity : AvaloniaMainActivity<App>
         try { SetTheme(Resource.Style.MyTheme); } catch { }
 
         Current = this;
-        QBasCopier.TransferHost.ExternalSink = DroidDir.SaveToTree;
         QBasCopier.TransferHost.OpenDoc = DroidList.Open;
         QBasCopier.TransferHost.DocInfo = DroidFile.Info;
         QBasCopier.TransferHost.ListDoc = DroidList.Children;
         QBasCopier.TransferHost.WriteDoc = DroidDir.OpenForWrite;
-        QBasCopier.CopyEngine.SafOpenDest = DroidDir.OpenForWriteIn;
         base.OnCreate(savedInstanceState);
     }
 
     protected override void OnDestroy()
     {
         if (Current == this) Current = null;
+        ReleaseLocks();
         base.OnDestroy();
+    }
+
+    public override void OnTrimMemory(TrimMemoryLevel level)
+    {
+        base.OnTrimMemory(level);
+        if (level >= TrimMemoryLevel.UiHidden) ReleaseLocks();
+    }
+
+    PowerManager? _pm;
+    PowerManager.WakeLock? _wake;
+    PowerManager.WifiLock? _wifi;
+
+    /// <summary>
+    /// Mantiene la CPU y el WiFi vivos mientras hay una copia o una transferencia.
+    /// Sin esto, con la pantalla apagada Android congela la app a mitad de un archivo
+    /// de 2 GB y la copia se queda parada sin error visible.
+    /// </summary>
+    public void KeepAwake()
+    {
+        try
+        {
+            _pm ??= (PowerManager?)GetSystemService(PowerService);
+            if (_pm == null) return;
+            if (_wake == null)
+            {
+                _wake = _pm.NewWakeLock(PowerManager.PartialWakeLock, "QBasCopier:transfer");
+                _wake.SetReferenceCounted(false);
+            }
+            if (!_wake.IsHeld) _wake.Acquire(TimeSpan.FromMinutes(6 * 60));
+            if (_wifi == null)
+            {
+                _wifi = _pm.NewWifiLock(PowerManager.WifiModeFullHighPerf, "QBasCopier:transfer");
+                _wifi.SetReferenceCounted(false);
+            }
+            if (!_wifi.IsHeld) _wifi.Acquire();
+        }
+        catch { }
+    }
+
+    public void ReleaseLocks()
+    {
+        try { if (_wake != null && _wake.IsHeld) _wake.Release(); } catch { }
+        try { if (_wifi != null && _wifi.IsHeld) _wifi.Release(); } catch { }
     }
 
     public void PickFiles(Action<string[]> done)
@@ -314,6 +570,33 @@ public class MainActivity : AvaloniaMainActivity<App>
             }
             catch { _pickerCb?.Invoke(Array.Empty<string>()); }
         });
+    }
+
+    /// <summary>Lo registra la UI para decidir si el boton atras se consume o no.</summary>
+    public static Func<bool>? BackHandler;
+
+    /// <summary>Cierre real de la app. MainWindow es un UserControl y no tiene Window que cerrar.</summary>
+    public void FinishApp()
+    {
+        try { Settings.Flush(); } catch { }
+        try { QBasCopier.TransferHost.Key = ""; } catch { }
+        RunOnUiThread(() =>
+        {
+            try { ReleaseLocks(); } catch { }
+            try { Finish(); } catch { }
+            try { global::Android.OS.Process.KillProcess(global::Android.OS.Process.MyPid()); } catch { }
+        });
+    }
+
+    public override void OnBackPressed()
+    {
+        try
+        {
+            var h = BackHandler;
+            if (h != null && h()) return;
+        }
+        catch { }
+        base.OnBackPressed();
     }
 
     public Action<string>? TreeCb;

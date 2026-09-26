@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- RED: imprescindible. Sin android.permission.INTERNET toda la parte de
+       transferencia (TCP 9527 + descubrimiento UDP 9528) falla al arrancar, y la
+       app no muestra ni siquiera un aviso: la excepcion se traga en Discovery/TransferHost. -->
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
   <uses-permission android:name="android.permission.CAMERA"/>
   <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
   <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+  <!-- Mantiene la CPU y el WiFi vivos durante una transferencia o copia larga
+       con la pantalla apagada. No es una excepcion en tiempo de ejecucion. -->
+  <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation"/>
   <uses-feature android:name="android.hardware.camera" android:required="false"/>

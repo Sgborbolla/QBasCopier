@@ -14,7 +14,9 @@ namespace QBasCopier;
 
 public static class NetTools
 {
-    public static long Now = Environment.TickCount64;
+    /// <summary>Reloj monotono real. Antes era un campo fijo evaluado al cargar, asi que
+    /// ningun par caducaba y la lista de dispositivos se congelaba para siempre.</summary>
+    public static long Now => Environment.TickCount64;
 
     public static List<string> LanIps()
     {
@@ -43,9 +45,6 @@ public sealed class TransferHost : IDisposable
     // path/área final donde se guarda el archivo recibido
     public event Action<string, long>? FileReceived;
 
-    // Permite guardar en un árbol de contenido (SAF en Android): (destino, nombre, stream) -> nombre usado
-    public static Func<string, string, Stream, string>? ExternalSink;
-
     // Ganchos SAF (los define MainActivity en Android). Permiten servir listados y descargas
     // cuando la carpeta de recibidos es un árbol content:// y no una ruta del sistema de archivos.
     public static Func<string, Stream>? OpenDoc;
@@ -56,6 +55,16 @@ public sealed class TransferHost : IDisposable
     public static Func<string, string, Stream>? WriteDoc;
 
     public static string DeviceName = "";
+
+    /// <summary>
+    /// Clave de emparejamiento. Si esta vacia el servidor es abierto (util en una red
+    /// domestica de confianza); si tiene valor, sin la clave correcta no se sube ni se
+    /// descarga nada. Antes se mostraba en el QR y jamas se comprobaba.
+    /// </summary>
+    public static string Key = "";
+
+    /// <summary>Tope de seguridad: nadie necesita un archivo de mas de 1 TB por HTTP.</summary>
+    public const long MaxFileBytes = 1024L * 1024 * 1024 * 1024;
 
     private TcpListener? _tcp;
     private CancellationTokenSource? _cts;
@@ -82,10 +91,19 @@ public sealed class TransferHost : IDisposable
         _ = Task.Run(() => Loop(_cts.Token));
     }
 
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, byte> _live = new();
+
     public void Stop()
     {
         try { _cts?.Cancel(); } catch { }
         try { _tcp?.Stop(); _tcp = null; } catch { }
+        // Sin esto, "Apagar" dejaba la descarga escribiendo en el disco de fondo.
+        foreach (var c in _live.Keys)
+        {
+            try { c.Client?.Shutdown(SocketShutdown.Both); } catch { }
+            try { c.Close(); } catch { }
+        }
+        _live.Clear();
     }
 
     private async Task Loop(CancellationToken ct)
@@ -107,6 +125,7 @@ public sealed class TransferHost : IDisposable
             try { c.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, 4 * 1024 * 1024); } catch { }
             try { c.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, 4 * 1024 * 1024); } catch { }
             try { c.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true); } catch { }
+            _live[c] = 0;
             using (c)
             using (var ns = c.GetStream())
             {
@@ -158,6 +177,19 @@ public sealed class TransferHost : IDisposable
                 var qn = QueryValue(query, "name");
                 if (qn.Length > 0) name = qn;
 
+                if (!Authorized(query, lines))
+                {
+                    await WriteRawAsync(ns, "HTTP/1.1 403 Prohibido\r\nAccess-Control-Allow-Origin: *\r\n" +
+                        "Content-Length: 0\r\nConnection: close\r\n\r\n");
+                    return;
+                }
+
+                if (len > MaxFileBytes)
+                {
+                    await WriteTextAsync(ns, "error: archivo demasiado grande");
+                    return;
+                }
+
                 var bodyStart = idx + 4;
                 var backlog = got - bodyStart; // bytes del cuerpo que ya llegaron pegados
 
@@ -185,6 +217,22 @@ public sealed class TransferHost : IDisposable
             }
         }
         catch { }
+        finally { _live.TryRemove(c, out _); }
+    }
+
+    /// <summary>Comprueba la clave de emparejamiento por cabecera o por ?k=.</summary>
+    private static bool Authorized(string query, string[] headerLines)
+    {
+        if (string.IsNullOrEmpty(Key)) return true;
+        foreach (var raw in headerLines)
+        {
+            var line = raw.TrimEnd('\r');
+            var ci = line.IndexOf(':');
+            if (ci <= 0) continue;
+            if (line[..ci].Trim().Equals("X-Key", StringComparison.OrdinalIgnoreCase))
+                if (line[(ci + 1)..].Trim() == Key) return true;
+        }
+        return QueryValue(query, "k") == Key;
     }
 
     // ------------------- interop HTTP: cualquier navegador o app -------------
@@ -282,6 +330,7 @@ public sealed class TransferHost : IDisposable
 
     private string PageHtml()
     {
+        var K = Uri.EscapeDataString(Key);
         var items = ListEntries(Inbox, 0);
         var sb = new StringBuilder();
         sb.Append("<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">")
@@ -302,10 +351,11 @@ public sealed class TransferHost : IDisposable
         {
             if (it.IsDir) { sb.Append("<tr><td>").Append(Html(it.Name)).Append("/</td><td>-</td><td></td></tr>"); continue; }
             sb.Append("<tr><td>").Append(Html(it.Rel)).Append("</td><td>").Append(FilePane.Human(it.Size))
-              .Append("</td><td><a href=\"/dl?u=").Append(Uri.EscapeDataString(it.Key)).Append("\">Descargar</a></td></tr>");
+              .Append("</td><td><a href=\"/dl?u=").Append(Uri.EscapeDataString(it.Key))
+              .Append(K.Length > 0 ? "&k=" + K : "").Append("\">Descargar</a></td></tr>");
         }
         sb.Append("</table>");
-        sb.Append("<script>async function go(){var i=document.getElementById('i'),s=document.getElementById('s');if(!i.files.length)return;s.textContent='Enviando...';for(var k=0;k<i.files.length;k++){var f=i.files[k];var r=await fetch('/up?name='+encodeURIComponent(f.name),{method:'POST',body:f});s.textContent='Enviado: '+f.name+' ('+r.status+')';}}</script>");
+        sb.Append("<script>async function go(){var i=document.getElementById('i'),s=document.getElementById('s');if(!i.files.length)return;s.textContent='Enviando...';for(var k=0;k<i.files.length;k++){var f=i.files[k];var r=await fetch('/up?name='+encodeURIComponent(f.name)+'&k='+K,{method:'POST',body:f});s.textContent='Enviado: '+f.name+' ('+r.status+')';}}</script>");
         sb.Append("</body></html>");
         return sb.ToString();
     }
@@ -358,10 +408,10 @@ public sealed class TransferHost : IDisposable
         if (rel.Length == 0) return "";
         try
         {
-            var full = Path.GetFullPath(Path.Combine(root, rel));
-            var baseFull = Path.GetFullPath(root);
-            if (!full.StartsWith(baseFull, StringComparison.OrdinalIgnoreCase)) return "";
-            if (full.Length <= baseFull.Length) return "";
+            var baseFull = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var full = Path.GetFullPath(Path.Combine(baseFull, rel));
+            // Sin la barra final, "/recibidos-secreto" pasaba el StartsWith de "/recibidos".
+            if (!full.StartsWith(baseFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) return "";
             return full;
         }
         catch { return ""; }
@@ -458,13 +508,15 @@ public sealed class TransferHost : IDisposable
     }
 
     private const int IoBuf = 1024 * 1024;
-    private readonly byte[] _scratch = new byte[IoBuf];
 
     private async Task<string> ReceiveAsync(NetworkStream ns, byte[] head, int bodyStart, int backlog, string rawName, long len)
     {
         await _slots.WaitAsync();
         Stream? outS = null;
         string writing = "";
+        // Buffer por recepcion. Antes era uno solo compartido por las 4 ranuras: con dos
+        // descargas simultaneas los bloques de una se escribian en el archivo de la otra.
+        var scratch = System.Buffers.ArrayPool<byte>.Shared.Rent(IoBuf);
         try
         {
             var name = Sanitize(rawName);
@@ -487,6 +539,7 @@ public sealed class TransferHost : IDisposable
             if (len == -2)
             {
                 if (backlog > 0) await outS.WriteAsync(head.AsMemory(bodyStart, backlog));
+                long chunkTotal = 0;
                 while (true)
                 {
                     var sizeLine = await ReadLineAsync(ns);
@@ -494,12 +547,14 @@ public sealed class TransferHost : IDisposable
                     if (!long.TryParse(sizeLine.Split(';')[0], System.Globalization.NumberStyles.HexNumber, null, out var size))
                         break;
                     if (size <= 0) break;
+                    chunkTotal += size;
+                    if (chunkTotal > MaxFileBytes) { outS.Dispose(); outS = null; return Abandon(writing); }
                     long left = size;
                     while (left > 0)
                     {
-                        int n = await ns.ReadAsync(_scratch.AsMemory(0, (int)Math.Min(left, IoBuf)));
+                        int n = await ns.ReadAsync(scratch.AsMemory(0, (int)Math.Min(left, IoBuf)));
                         if (n <= 0) return Abandon(writing);
-                        await outS.WriteAsync(_scratch.AsMemory(0, n));
+                        await outS.WriteAsync(scratch.AsMemory(0, n));
                         left -= n;
                         bytes += n;
                     }
@@ -508,12 +563,15 @@ public sealed class TransferHost : IDisposable
             }
             else
             {
-                long left = len >= 0 ? len - backlog : long.MaxValue;
+                // len < 0 = longitud desconocida: sin tope, un cliente que nunca cierra
+                // la conexion llenaria el disco. Se corta al pasar del maximo permitido.
+                long left = len >= 0 ? len - backlog : MaxFileBytes - backlog;
+                if (left <= 0) { outS.Dispose(); outS = null; return Abandon(writing); }
                 while (left > 0)
                 {
-                    int n = await ns.ReadAsync(_scratch.AsMemory(0, (int)Math.Min(left, IoBuf)));
+                    int n = await ns.ReadAsync(scratch.AsMemory(0, (int)Math.Min(left, IoBuf)));
                     if (n <= 0) break;
-                    await outS.WriteAsync(_scratch.AsMemory(0, n));
+                    await outS.WriteAsync(scratch.AsMemory(0, n));
                     bytes += n;
                     left -= n;
                 }
@@ -530,6 +588,7 @@ public sealed class TransferHost : IDisposable
         finally
         {
             try { outS?.Dispose(); } catch { }
+            System.Buffers.ArrayPool<byte>.Shared.Return(scratch);
             _slots.Release();
         }
     }
@@ -585,16 +644,12 @@ public sealed class TransferHost : IDisposable
         return -1;
     }
 
-    private static void TryDelete(string p)
-    {
-        try { if (File.Exists(p)) File.Delete(p); } catch { }
-    }
-
     private static string Sanitize(string name)
     {
         var inv = Path.GetInvalidFileNameChars();
-        var ok = new string(name.Where(c => !inv.Contains(c)).ToArray()).Trim();
-        if (ok.Length == 0) ok = "archivo.bin";
+        var ok = new string(name.Where(c => !inv.Contains(c) && c >= ' ').ToArray()).Trim();
+        ok = ok.TrimStart('.');
+        if (ok.Length == 0 || ok is "." or "..") ok = "archivo.bin";
         if (ok.Length > 180) ok = ok[..180];
         return ok;
     }
@@ -618,6 +673,9 @@ public sealed class TransferHost : IDisposable
 
 public static class TransferClient
 {
+    /// <summary>Clave de emparejamiento que se envia en X-Key.</summary>
+    public static string Key = "";
+
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(30) };
     private const int Buf = 1024 * 1024;
 
@@ -645,6 +703,7 @@ public static class TransferClient
                 "POST /up HTTP/1.1\r\n" +
                 "Host: " + host + ":" + port + "\r\n" +
                 "X-File: " + Uri.EscapeDataString(name) + "\r\n" +
+                "X-Key: " + (Key.Length > 0 ? Key : "-") + "\r\n" +
                 "X-Len: " + total.ToString() + "\r\n" +
                 "Content-Length: " + total.ToString() + "\r\n" +
                 "Content-Type: application/octet-stream\r\n" +

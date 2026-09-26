@@ -18,9 +18,23 @@ public sealed record ErrorDecision(CopyAction Action, bool Always);
 public sealed class CopyItem : INotifyPropertyChanged
 {
     public string SourcePath { get; set; } = "";
-    public string DestPath { get; set; } = "";
+
+    /// <summary>Carpeta destino: ruta del sistema de archivos o URI de carpeta SAF.</summary>
+    public string DestDir { get; set; } = "";
+
+    /// <summary>Ruta del elemento dentro de DestDir, incluyendo su propio nombre.</summary>
+    public string Rel { get; set; } = "";
+
     public bool IsDirectory { get; set; }
     public bool IsContent { get; set; }   // true cuando SourcePath es content:// (Android/SAF)
+
+    /// <summary>El destino es una carpeta SAF: no existe en el sistema de archivos.</summary>
+    public bool IsSafDest =>
+        DestDir.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Solo para mostrar. Un destino SAF es (carpeta + ruta relativa), no una ruta.</summary>
+    public string DestPath =>
+        IsSafDest ? DestDir.TrimEnd('/') + "/" + Rel : Path.Combine(DestDir, Rel);
 
     private long _total;
     public long TotalBytes { get => _total; set { _total = value; On(nameof(TotalBytes)); On(nameof(Percent)); } }
@@ -42,9 +56,38 @@ public sealed class CopyItem : INotifyPropertyChanged
     private string _conflictInfo = "";
     public string ConflictInfo { get => _conflictInfo; set => On(nameof(ConflictInfo)); }
 
-    public string Name => Path.GetFileName(SourcePath.TrimEnd('\\'));
+    /// <summary>Reintentos ya gastados, para no reintentar un error de forma infinita.</summary>
+    public int Retries { get; set; }
+
+    /// <summary>
+    /// Nombre real del origen. Para content:// hay que preguntarlo al ContentResolver:
+    /// Path.GetFileName devolveria la docId codificada ("primary%3ADownloads%2Ffoto.jpg").
+    /// </summary>
+    public string Name
+    {
+        get
+        {
+#if ANDROID
+            if (IsContent)
+            {
+                try { return QBasCopier.Android.DroidPub.SafeName(SourcePath); } catch { }
+            }
+#endif
+            return Path.GetFileName(SourcePath.TrimEnd('\\', '/'));
+        }
+    }
+
     public string SizeText => FilePane.Human(TotalBytes);
-    public string DestName => Path.GetFileName(DestPath.TrimEnd('\\'));
+
+    public string DestName
+    {
+        get
+        {
+            var r = Rel.Replace('\\', '/');
+            var i = r.LastIndexOf('/');
+            return i < 0 ? r : r[(i + 1)..];
+        }
+    }
 
     public void AddBytes(long n) { DoneBytes = DoneBytes + n; }
 
@@ -202,6 +245,8 @@ public sealed class CopyEngine
         }
     }
 
+    private const int MaxRetries = 5;
+
     private sealed class PauseInterrupt : Exception { }
 
     private bool AllFinished()
@@ -252,12 +297,12 @@ public sealed class CopyEngine
         if (TryGetSize(it, out var size))
             it.TotalBytes = size;
 
-        if (File.Exists(it.DestPath) || Directory.Exists(it.DestPath))
+        if (DestExists(it))
         {
             var cd = await ResolveCollisionAsync(it, ct);
             if (cd.Action == CopyAction.CancelAll) return CopyAction.CancelAll;
             if (cd.Action == CopyAction.Skip) return Mark(it, ItemState.Skipped, L.Get("stateSkipped"));
-            if (cd.Action == CopyAction.Rename) it.DestPath = NextRenamePath(it.DestPath);
+            if (cd.Action == CopyAction.Rename) RenameDest(it);
             if (cd.Action == CopyAction.OverwriteIfDifferent)
             {
                 if (!it.IsDirectory && SameLengthAndNewer(it)) return Mark(it, ItemState.Skipped, L.Get("stateSkipped"));
@@ -282,13 +327,10 @@ public sealed class CopyEngine
                 await CopyFileWithEngineAsync(it, resume, ct);
 
             CopyMetadata(it);
-            if (S.VerifyChecksum && !it.IsDirectory && !it.IsContent) VerifyIntegrity(it);
+            if (S.VerifyChecksum && !it.IsDirectory) VerifyIntegrity(it);
 
-            if (Move && !it.IsContent)
-            {
-                try { if (it.IsDirectory) Directory.Delete(it.SourcePath, true); else File.Delete(it.SourcePath); }
-                catch { }
-            }
+            // "Mover" tambien borra el origen cuando viene del explorador SAF.
+            if (Move) DeleteSource(it);
 
             TotalsChanged?.Invoke();
             return Mark(it, ItemState.Done, L.Get("stateDone"));
@@ -322,34 +364,15 @@ public sealed class CopyEngine
 
     private bool TryGetSize(CopyItem it, out long size)
     {
-        size = -1;
-        try
-        {
-            if (it.IsContent)
-            {
-#if ANDROID
-                var (_, sz) = QBasCopier.Android.DroidFile.Info(it.SourcePath);
-                size = sz;
-                return true;
-#else
-                return false;
-#endif
-            }
-            if (it.IsDirectory)
-            {
-                size = new DirectoryInfo(it.SourcePath)
-                       .EnumerateFiles("*", SearchOption.AllDirectories)
-                       .Sum(f => f.Length);
-                return size >= 0;
-            }
-            var fi = new FileInfo(it.SourcePath);
-            size = fi.Length; return true;
-        }
-        catch { return false; }
+        size = SourceLength(it);
+        return size >= 0;
     }
 
     private bool SameLengthAndNewer(CopyItem it)
     {
+        // En SAF no se puede comparar sin abrir el documento: se asume diferente y se
+        // sobrescribe, que es el comportamiento esperado de "sobrescribir si es distinto".
+        if (it.IsSafDest) return false;
         try
         {
             var a = new FileInfo(it.SourcePath); var b = new FileInfo(it.DestPath);
@@ -358,79 +381,88 @@ public sealed class CopyEngine
         catch { return false; }
     }
 
-    private string NextRenamePath(string path)
+    private void RenameDest(CopyItem it)
     {
-        if (S != null && !string.IsNullOrEmpty(S.RenameNewPattern) && S.RenameNewPattern.Contains("%NAME%"))
+#if ANDROID
+        if (it.IsSafDest)
         {
-            var dir = Path.GetDirectoryName(path) ?? "";
-            var name = Path.GetFileNameWithoutExtension(path);
-            var ext = Path.GetExtension(path).TrimStart('.');
+            it.Rel = QBasCopier.Android.DroidDir.NextFreeName(it.DestDir, it.Rel);
+            return;
+        }
+#endif
+        it.Rel = NextFreeRel(it.DestPath);
+    }
+
+    private void DeleteSource(CopyItem it)
+    {
+        try
+        {
+#if ANDROID
+            if (it.IsContent) { QBasCopier.Android.DroidDir.Delete(it.SourcePath); return; }
+#endif
+            if (it.IsDirectory) Directory.Delete(it.SourcePath, true);
+            else File.Delete(it.SourcePath);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Primer nombre libre dentro de la carpeta de "path". Devuelve solo el nombre
+    /// nuevo, no la ruta completa, porque se guarda en CopyItem.Rel.
+    /// </summary>
+    private string NextFreeRel(string path)
+    {
+        var dir = Path.GetDirectoryName(path) ?? "";
+        var stem = Path.GetFileNameWithoutExtension(path);
+        var ext = Path.GetExtension(path);
+
+        if (!string.IsNullOrEmpty(S.RenameNewPattern) && S.RenameNewPattern.Contains("%NAME%"))
+        {
             for (int n = 1; n < 1000; n++)
             {
                 var fn = S.RenameNewPattern
-                    .Replace("%NAME%", name)
-                    .Replace("%EXT%", ext)
+                    .Replace("%NAME%", stem)
+                    .Replace("%EXT%", ext.TrimStart('.'))
                     .Replace("%COPY%", n.ToString());
                 if (fn.Length == 0) break;
+                // El patron es configurable: si trae separadores se descarta, o el
+                // archivo se escribiria fuera de la carpeta de destino.
+                if (fn.Contains('/') || fn.Contains('\\')) continue;
                 var cand = Path.Combine(dir, fn);
-                if (!File.Exists(cand) && !Directory.Exists(cand)) return cand;
+                if (!File.Exists(cand) && !Directory.Exists(cand)) return fn;
             }
         }
+
         for (int n = 1; n < 100000; n++)
         {
-            string cand = $"{Path.GetDirectoryName(path)}/{Path.GetFileNameWithoutExtension(path)} ({n}){Path.GetExtension(path)}";
-            if (!File.Exists(cand) && !Directory.Exists(cand)) return cand;
+            string fn = $"{stem} ({n}){ext}";
+            var cand = Path.Combine(dir, fn);
+            if (!File.Exists(cand) && !Directory.Exists(cand)) return fn;
         }
-        return path;
+        return Path.GetFileName(path);
     }
 
     // ------------- native + buffer engines -------------
     private async Task CopyFileWithEngineAsync(CopyItem it, bool resumeOffset, CancellationToken ct)
     {
-        if (it.IsContent)
-        {
 #if ANDROID
-            await ContentCopyAsync(it, ct);
-#else
-            await BufferedCopyAsync(it, resumeOffset, ct);
+        // En Android tanto el origen como el destino pueden ser SAF: se copia por Stream.
+        if (it.IsContent || it.IsSafDest) { await BufferedCopyAsync(it, resumeOffset, ct); return; }
 #endif
-            return;
-        }
         bool useNative = S.Engine != "buffer" && !resumeOffset && OperatingSystem.IsWindows();
-        if (useNative)
-            await NativeCopyAsync(it, ct);
-        else
-            await BufferedCopyAsync(it, resumeOffset, ct);
+        if (useNative) await NativeCopyAsync(it, ct);
+        else await BufferedCopyAsync(it, resumeOffset, ct);
     }
 
-#if ANDROID
-    private async Task ContentCopyAsync(CopyItem it, CancellationToken ct)
+    /// <summary>Abre el origen como Stream (archivo normal o documento SAF).</summary>
+    private Stream OpenSource(CopyItem it)
     {
-        using var src = QBasCopier.Android.DroidList.Open(it.SourcePath);
-        int buf = (int)Math.Clamp(S.BufferBytes, 64 * 1024, 64 * 1024 * 1024);
-        var dstStream = OpenDestWrite(it.DestPath, FileMode.Create, buf);
-        if (dstStream == null) throw new IOException("No se pudo escribir en: " + it.DestPath);
-        await using var dst = dstStream;
-        var buffer = new byte[buf];
-        long done = 0;
-        while (true)
-        {
-            _gate.Wait(ct);
-            if (_paused) continue;
-            ct.ThrowIfCancellationRequested();
-            int n = await src.ReadAsync(buffer, 0, buf, ct);
-            if (n <= 0) break;
-            Throttle(n);
-            await dst.WriteAsync(buffer.AsMemory(0, n), ct);
-            done += n;
-            it.DoneBytes = done;
-            it.TotalBytes = it.TotalBytes > 0 ? it.TotalBytes : done;
-            Interlocked.Add(ref _doneBytes, n);
-            ItemStatus?.Invoke(it);
-            TotalsChanged?.Invoke();
-        }
-    }
+#if ANDROID
+        if (it.IsContent) return QBasCopier.Android.DroidList.Open(it.SourcePath);
 #endif
+        int buf = (int)Math.Clamp(S.BufferBytes, 64 * 1024, 64 * 1024 * 1024);
+        return new FileStream(it.SourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, buf, true);
+    }
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool CopyFileEx(string existing, string nw, CopyProgressRoutine? proc,
@@ -498,37 +530,48 @@ public sealed class CopyEngine
         }
     }
 
+    /// <summary>
+    /// Copia por Stream. Sirve para los tres casos: origen SAF, destino SAF o ambos
+    /// (file:///storage/emulated/0 -> content://... en Android 11+, que antes fallaba).
+    /// </summary>
     private async Task BufferedCopyAsync(CopyItem it, bool resume, CancellationToken ct)
     {
-        long sourceLen = new FileInfo(it.SourcePath).Length;
-        if (it.TotalBytes <= 0) it.TotalBytes = sourceLen;
+        long sourceLen = it.TotalBytes > 0 ? it.TotalBytes : SourceLength(it);
+        if (sourceLen < 0) throw new IOException("No se pudo obtener el tamano: " + it.Name);
+        it.TotalBytes = sourceLen;
         int buf = (int)Math.Clamp(S.BufferBytes, 64 * 1024, 64 * 1024 * 1024);
 
-        await using var src = new FileStream(it.SourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, buf, true);
         long offset = 0;
-        Stream dst;
-        if (resume && !IsSafPath(it.DestPath) && File.Exists(it.DestPath))
-        {
-            var ds = new FileInfo(it.DestPath);
-            if (ds.Length < sourceLen)
-            {
-                offset = ds.Length;
-                dst = new FileStream(it.DestPath, FileMode.Open, FileAccess.Write, FileShare.None, buf, true);
-                dst.Seek(offset, SeekOrigin.Begin);
-            }
-            else { CleanupPartial(it); throw new IOException("Destination same or larger"); }
-        }
-        else
-        {
-            var d = OpenDestWrite(it.DestPath, FileMode.Create, buf);
-            if (d == null) throw new IOException("No se pudo escribir en: " + it.DestPath);
-            dst = d;
-        }
-
-        src.Seek(offset, SeekOrigin.Begin);
-        var buffer = new byte[buf];
+        Stream? opened = null;
         try
         {
+            if (resume && !it.IsSafDest && File.Exists(it.DestPath))
+            {
+                var ds = new FileInfo(it.DestPath);
+                if (ds.Length < sourceLen)
+                {
+                    offset = ds.Length;
+                    opened = new FileStream(it.DestPath, FileMode.Open, FileAccess.Write, FileShare.None, buf, true);
+                    opened.Seek(offset, SeekOrigin.Begin);
+                }
+                else { CleanupPartial(it); throw new IOException("El destino es igual o mayor que el origen"); }
+            }
+        }
+        catch when (opened == null) { CleanupPartial(it); throw; }
+
+        Stream? dst = opened;
+        try
+        {
+            if (dst == null)
+            {
+                dst = OpenDestWrite(it, FileMode.Create, buf);
+                if (dst == null) throw new IOException("No se pudo escribir en: " + it.DestPath);
+            }
+
+            await using var src = OpenSource(it);
+            if (offset > 0) src.Seek(offset, SeekOrigin.Begin);
+
+            var buffer = new byte[buf];
             long done = offset;
             while (done < sourceLen)
             {
@@ -549,29 +592,48 @@ public sealed class CopyEngine
         }
         finally
         {
-            await dst.DisposeAsync();
+            if (dst != null) await dst.DisposeAsync();
         }
+    }
+
+    private long SourceLength(CopyItem it)
+    {
+        try
+        {
+#if ANDROID
+            if (it.IsContent) return QBasCopier.Android.DroidFile.Info(it.SourcePath).Size;
+#endif
+            if (it.IsDirectory)
+                return new DirectoryInfo(it.SourcePath).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
+            return new FileInfo(it.SourcePath).Length;
+        }
+        catch { return -1; }
     }
 
     private async Task CopyDirectoryAsync(CopyItem it, CancellationToken ct)
     {
         // En Android el destino puede ser una carpeta SAF (content://). No existe en el
         // sistema de archivos, asi que no se puede crear con Directory.CreateDirectory:
-        // DocumentsContract crea las carpetas solas al crear el documento hijo.
-        if (!IsSafPath(it.DestPath)) Directory.CreateDirectory(it.DestPath);
+        // las carpetas se crean a traves de DocumentsContract al abrir cada hijo.
+        if (!it.IsSafDest) Directory.CreateDirectory(it.DestPath);
         long acc = 0;
         foreach (var file in Directory.EnumerateFiles(it.SourcePath, "*", SearchOption.AllDirectories))
         {
             _gate.Wait(ct);
             ct.ThrowIfCancellationRequested();
             var rel = Path.GetRelativePath(it.SourcePath, file);
-            var target = CombineDest(it.DestPath, rel);
-            if (!IsSafPath(target))
+            var sub = new CopyItem
             {
-                var pd = Path.GetDirectoryName(target);
+                SourcePath = file,
+                DestDir = it.DestDir,
+                Rel = CombineRel(it.Rel, rel),
+                TotalBytes = new FileInfo(file).Length
+            };
+            if (!sub.IsSafDest)
+            {
+                var pd = Path.GetDirectoryName(sub.DestPath);
                 if (!string.IsNullOrEmpty(pd)) Directory.CreateDirectory(pd);
             }
-            var sub = new CopyItem { SourcePath = file, DestPath = target, TotalBytes = new FileInfo(file).Length };
             await CopyFileWithEngineAsync(sub, false, ct);
             acc += sub.TotalBytes;
             it.DoneBytes = acc;
@@ -580,44 +642,58 @@ public sealed class CopyEngine
         }
     }
 
-    /// <summary>
-    /// Solo Android. Abre un destino content:// de SAF: (uriCarpeta, nombreArchivo) -> Stream.
-    /// Lo asigna MainActivity al arrancar. En PC se queda null y se usa FileStream.
-    /// </summary>
-    public static Func<string, string, Stream?>? SafOpenDest { get; set; }
+    /// <summary>Une la ruta interna de un elemento con la ruta de la carpeta que se copia.</summary>
+    private static string CombineRel(string rel, string sub)
+    {
+        var r = rel.Replace('\\', '/').Trim('/');
+        var v = sub.Replace('\\', '/');
+        return r.Length == 0 ? v : r + "/" + v;
+    }
 
     /// <summary>True si la ruta es un content:// de SAF (solo Android).</summary>
     public static bool IsSafPath(string p) =>
         p.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Une subruta con un destino SAF conservando el esquema content://.</summary>
-    private static string CombineDest(string dir, string rel)
+    /// <summary>
+    /// Abre el destino para escribir. En Android el destino puede ser una carpeta SAF,
+    /// y en Android 11+ escribir con FileStream en /storage/emulated/0 esta prohibido
+    /// (scoped storage), asi que se delega en DocumentsContract creando las carpetas
+    /// intermedias que falten.
+    /// </summary>
+    private Stream? OpenDestWrite(CopyItem it, FileMode mode, int buf)
     {
-        if (!IsSafPath(dir)) return Path.Combine(dir, rel);
-        var slash = dir.EndsWith("/") ? dir : dir + "/";
-        return slash + rel.Replace('\\', '/');
+#if ANDROID
+        if (it.IsSafDest)
+        {
+            var rel = it.Rel.Replace('\\', '/');
+            var i = rel.LastIndexOf('/');
+            var dirRel = i < 0 ? "" : rel.Substring(0, i);
+            var name = i < 0 ? rel : rel.Substring(i + 1);
+            if (name.Length == 0) return null;
+            var dir = dirRel.Length == 0
+                ? it.DestDir
+                : QBasCopier.Android.DroidDir.EnsurePath(it.DestDir, dirRel);
+            if (dir == null) return null;
+            return QBasCopier.Android.DroidDir.OpenForWriteIn(dir, name);
+        }
+#endif
+        var pd = Path.GetDirectoryName(it.DestPath);
+        if (!string.IsNullOrEmpty(pd) && mode == FileMode.Create) Directory.CreateDirectory(pd);
+        return new FileStream(it.DestPath, mode, FileAccess.Write, FileShare.None, buf, true);
     }
 
-    /// <summary>
-    /// Abre el destino para escribir. En Android el destino puede ser un documento SAF,
-    /// y en Android 11+ escribir con FileStream en /storage/emulated/0 esta prohibido
-    /// (scoped storage), por eso se delega en DocumentsContract.
-    /// </summary>
-    private static Stream? OpenDestWrite(string destPath, FileMode mode, int buf)
+    /// <summary>Existe ya el destino (archivo o carpeta), sea ruta o SAF.</summary>
+    private static bool DestExists(CopyItem it)
     {
-        if (IsSafPath(destPath) && SafOpenDest != null)
-        {
-            var i = destPath.LastIndexOf('/');
-            var dir = i > 0 ? destPath.Substring(0, i) : destPath;
-            var name = i >= 0 ? destPath.Substring(i + 1) : destPath;
-            return SafOpenDest(dir, name);
-        }
-        return new FileStream(destPath, mode, FileAccess.Write, FileShare.None, buf, true);
+#if ANDROID
+        if (it.IsSafDest) return QBasCopier.Android.DroidDir.FileExistsIn(it.DestDir, it.Rel);
+#endif
+        return File.Exists(it.DestPath) || Directory.Exists(it.DestPath);
     }
 
     private void CopyMetadata(CopyItem it)
     {
-        if (it.IsContent) return;
+        if (it.IsContent || it.IsSafDest) return;   // SAF no expone atributos de archivo
         try
         {
             File.SetAttributes(it.DestPath, File.GetAttributes(it.SourcePath));
@@ -646,24 +722,51 @@ public sealed class CopyEngine
         catch { }
     }
 
+    /// <summary>
+    /// SHA-256 del origen y del destino. Funciona tambien con SAF: antes solo miraba
+    /// File.Exists, asi que copiar de /storage a una carpeta SAF con la casilla de
+    /// verificacion marcada terminaba siempre en error "missing files".
+    /// </summary>
     private void VerifyIntegrity(CopyItem it)
     {
-        if (!File.Exists(it.SourcePath) || !File.Exists(it.DestPath))
-            throw new IOException("verify: missing files");
-        using var s = File.OpenRead(it.SourcePath);
-        using var d = File.OpenRead(it.DestPath);
+        using var s = OpenSource(it);
         var h1 = SHA256.HashData(s);
+        using var d = OpenDestRead(it);
         var h2 = SHA256.HashData(d);
         if (!h1.AsSpan().SequenceEqual(h2))
             throw new IOException("SHA-256 mismatch");
+    }
+
+    private Stream OpenDestRead(CopyItem it)
+    {
+#if ANDROID
+        if (it.IsSafDest)
+        {
+            var rel = it.Rel.Replace('\\', '/');
+            var i = rel.LastIndexOf('/');
+            var dirRel = i < 0 ? "" : rel.Substring(0, i);
+            var name = i < 0 ? rel : rel.Substring(i + 1);
+            var dir = dirRel.Length == 0
+                ? it.DestDir
+                : QBasCopier.Android.DroidDir.EnsurePath(it.DestDir, dirRel);
+            if (dir != null)
+            {
+                var kids = QBasCopier.Android.DroidList.Children(dir);
+                foreach (var k in kids)
+                    if (!k.IsDir && k.Name == name) return QBasCopier.Android.DroidList.Open(k.Uri);
+            }
+            throw new IOException("No se pudo reabrir el destino para verificar");
+        }
+#endif
+        return new FileStream(it.DestPath, FileMode.Open, FileAccess.Read, FileShare.Read);
     }
 
     private bool DelPartial() => S.DeleteUnfinished;
 
     private void CleanupPartial(CopyItem it)
     {
-        if (!DelPartial()) return;
-        try { if (File.Exists(it.DestPath)) File.Delete(it.DestPath); } catch { }
+        if (!DelPartial() || it.IsSafDest) return;   // en SAF se deja la parcial: borrarla
+        try { if (File.Exists(it.DestPath)) File.Delete(it.DestPath); } catch { }  // da menos miedo
     }
 
     // ------------- collision / error resolvers -------------
@@ -712,7 +815,10 @@ public sealed class CopyEngine
                 Cancel();
                 return CopyAction.CancelAll;
             case "bottom":
-                return CopyAction.Retry;
+                // Sin tope el mismo error se reencolaba para siempre y el lote no terminaba.
+                if (++it.Retries <= MaxRetries) return CopyAction.Retry;
+                LogMessage?.Invoke($"{DateTime.Now:HH:mm:ss} | {it.SourcePath} | se agoto tras {MaxRetries} intentos");
+                return CopyAction.Skip;
         }
 
         if (AskError == null) return CopyAction.Skip;
