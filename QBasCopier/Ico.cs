@@ -143,7 +143,7 @@ public static class Ico
     /// <summary>Cambia el tamano de un icono ya creado, para el escalado por pantalla.</summary>
     public static void SetSize(Control c, double size)
     {
-        if (c is IconView v) { v.IconSize = size; v.Width = size; v.Height = size; v.InvalidateMeasure(); }
+        if (c is IconView v) { v.IconSize = size; v.Width = size; v.Height = size; v.InvalidateMeasure(); v.InvalidateVisual(); }
     }
 
     /// <summary>Control con icono y texto al lado, para los botones de la barra de comandos.</summary>
@@ -189,12 +189,19 @@ public static class Ico
             Height = IconSize;
         }
 
-        public override void Measure(Size availableSize)
+        /// <summary>
+        /// En Avalonia 11 Measure no es virtual: el tamaño que un control quiere
+        /// ocupar se declara con MeasureOverride, no sobreescribiendo Measure.
+        /// Por eso el icono declara un cuadrado de su tamano y asi el que lo
+        /// contiene lo mide bien.
+        /// </summary>
+        protected override Size MeasureOverride(Size availableSize)
         {
-            base.Measure(new Size(IconSize, IconSize));
+            var s = IconSize > 0 ? IconSize : 24;
+            return new Size(s, s);
         }
 
-        public override void Render(DrawingContext ctx)
+        protected override void Render(DrawingContext ctx)
         {
             base.Render(ctx);
             var b = _brush ?? Brushes.White;
