@@ -201,7 +201,11 @@ public static class Ico
             return new Size(s, s);
         }
 
-        protected override void Render(DrawingContext ctx)
+        /// <remarks>
+        /// Render es public en Visual, asi que aqui va public. Lo que si es
+        /// protected es MeasureOverride, que es donde se declara el tamano.
+        /// </remarks>
+        public override void Render(DrawingContext ctx)
         {
             base.Render(ctx);
             var b = _brush ?? Brushes.White;
