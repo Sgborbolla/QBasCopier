@@ -90,6 +90,9 @@ public static class Ico
         ["star"] = new[] { new[] { 12.0, 12.0, 0.4 } },
         ["music"] = new[] { new[] { 6.0, 18.0, 3.0 }, new[] { 16.0, 16.0, 3.0 } },
         ["warning"] = new[] { new[] { 12.0, 17.0, 0.4 } },
+        // Eslabones: dos anillos que se pisan, como una cadena. Es el icono de
+        // "unirse" en la ventanita de Transferir.
+        ["link"] = new[] { new[] { 8.6, 12.0, 3.6 }, new[] { 15.4, 12.0, 3.6 } },
     };
 
     private static readonly Dictionary<string, Geometry> Cache = new();
