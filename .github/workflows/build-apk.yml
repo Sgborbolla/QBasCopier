@@ -52,6 +52,9 @@ jobs:
         run: |
           set -e
           apk=$(ls QBasCopier.Android/bin/Release/net8.0-android*/*.apk | head -1)
-          cp "$apk" "QBasCopier&Transfer-v1.1.apk"
+          # GitHub convierte el "&" en "." en el nombre de un asset de release
+          # (probado por API), asi que ahi va con guion. El archivo local si
+          # lleva el ampersand: build-android.sh deja dist/QBasCopier&Transfer-v1.1.apk
+          cp "$apk" "QBasCopier-Transfer-v1.1.apk"
           gh release delete v1.1-apk --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create v1.1-apk "QBasCopier&Transfer-v1.1.apk" --title "QBasCopier&Transfer 1.1" --notes "Version Android para celular. Compilada con GitHub Actions."
+          gh release create v1.1-apk "QBasCopier-Transfer-v1.1.apk" --title "QBasCopier&Transfer 1.1" --notes "Version Android para celular. Compilada con GitHub Actions."
