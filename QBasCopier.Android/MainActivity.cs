@@ -512,15 +512,15 @@ public class MainActivity : AvaloniaMainActivity<App>
         base.OnDestroy();
     }
 
-    public override void OnTrimMemory(TrimMemoryLevel level)
+    public override void OnTrimMemory(global::Android.ComponentModels.ActivityManager.TrimMemoryLevel level)
     {
         base.OnTrimMemory(level);
-        if (level >= TrimMemoryLevel.UiHidden) ReleaseLocks();
+        if (level >= global::Android.ComponentModels.ActivityManager.TrimMemoryLevel.UiHidden) ReleaseLocks();
     }
 
     PowerManager? _pm;
     PowerManager.WakeLock? _wake;
-    PowerManager.WifiLock? _wifi;
+    global::Android.Wifi.WifiLock? _wifi;
 
     /// <summary>
     /// Mantiene la CPU y el WiFi vivos mientras hay una copia o una transferencia.

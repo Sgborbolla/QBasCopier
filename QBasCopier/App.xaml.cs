@@ -19,6 +19,7 @@ public partial class App : Application
     {
         try
         {
+#if !ANDROID
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -30,8 +31,8 @@ public partial class App : Application
                 w.Content.As<MainWindow>()?.InitialBoot();
                 CrashLog.Info("InitialBoot done");
             }
-#if ANDROID
-            else if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+#else
+            if (ApplicationLifetime is ISingleViewApplicationLifetime singleView)
             {
                 // En Android el lifetime es un SingleViewLifetime y la activity hace
                 // SetContentView(lifetime.MainView). Sin esto no hay nada que mostrar:

@@ -399,12 +399,13 @@ public sealed partial class MainWindow : UserControl
         catch { }
     }
 
+#if !ANDROID
     private async Task PickInboxDesktopAsync()
     {
         try
         {
             var d = new OpenFolderDialog { Title = "Carpeta de recibidos…" };
-            var r = await d.ShowAsync(this);
+            var r = await d.ShowAsync(Host);
             if (!string.IsNullOrEmpty(r))
             {
                 S.TransferInbox = r;
@@ -416,6 +417,7 @@ public sealed partial class MainWindow : UserControl
         }
         catch { }
     }
+#endif
 
     private void ScanQr()
     {
@@ -1490,7 +1492,7 @@ public sealed partial class MainWindow : UserControl
     {
         var bOk = new Button { Content = L.Get("ok") };
         var bNo = new Button { Content = L.Get("cancel") };
-        var res = await AskAsync(L.Get("addListsWhen"), 380, 170, done =>
+        var res = await AskAsync<bool>(L.Get("addListsWhen"), 380, 170, done =>
         {
             bOk.Click += (_, _) => done(true);
             bNo.Click += (_, _) => done(false);
@@ -1691,7 +1693,7 @@ public sealed partial class MainWindow : UserControl
 
     private async Task<CollisionDecision> PickCollisionAsync(CopyItem it, string target)
     {
-        var res = await AskAsync(L.Get("colTitle"), 640, 360, done =>
+        var res = await AskAsync<CollisionDecision>(L.Get("colTitle"), 640, 360, done =>
         {
             var sp = new StackPanel { Spacing = 8 };
             sp.Children.Add(MkLbl(L.Get("colTitle") + ":", 15));
@@ -1716,7 +1718,7 @@ public sealed partial class MainWindow : UserControl
 
     private async Task<ErrorDecision> PickErrorAsync(CopyItem it, string msg)
     {
-        var res = await AskAsync(L.Get("errTitle"), 640, 320, done =>
+        var res = await AskAsync<ErrorDecision>(L.Get("errTitle"), 640, 320, done =>
         {
             var sp = new StackPanel { Spacing = 8 };
             sp.Children.Add(MkLbl(it.SourcePath, 12).Tint(TextSoft));
@@ -1810,17 +1812,41 @@ public sealed partial class MainWindow : UserControl
     private void PickDirInto(TextBox tb) => _ = PickDirAsync(tb);
     private async Task PickDirAsync(TextBox tb)
     {
+#if ANDROID
+        // En Android no hay OpenFolderDialog (exige un owner Window y solo admite rutas
+        // del sistema de archivos): se usa el selector de carpetas del sistema, que ademas
+        // concede permiso de escritura real sobre la carpeta elegida.
+        var ma = global::QBasCopier.Android.MainActivity.Current;
+        if (ma == null) return;
+        ma.PickTree(uri =>
+        {
+            if (string.IsNullOrEmpty(uri)) return;
+            DispatchUi(() => tb.Text = global::QBasCopier.Android.DroidList.Root(uri));
+        });
+        await Task.CompletedTask;
+#else
         var dlg = new OpenFolderDialog { Title = L.Get("browse") };
-        var dir = await dlg.ShowAsync(this);
+        var dir = await dlg.ShowAsync(Host);
         if (!string.IsNullOrEmpty(dir)) tb.Text = dir;
+#endif
     }
 
     private void PickFiles() => _ = PickFilesAsync();
     private async Task PickFilesAsync()
     {
+#if ANDROID
+        var ma = global::QBasCopier.Android.MainActivity.Current;
+        if (ma == null) return;
+        ma.PickFiles(uris => DispatchUi(() =>
+        {
+            if (uris.Length > 0) AddFiles(uris);
+        }));
+        await Task.CompletedTask;
+#else
         var dlg = new OpenFileDialog { Title = L.Get("addFiles"), AllowMultiple = true };
-        var files = await dlg.ShowAsync(this);
+        var files = await dlg.ShowAsync(Host);
         if (files != null && files.Length > 0) AddFiles(files);
+#endif
     }
 }
 
