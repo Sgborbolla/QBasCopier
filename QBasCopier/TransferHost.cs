@@ -350,7 +350,7 @@ public sealed class TransferHost : IDisposable
         foreach (var it in items)
         {
             if (it.IsDir) { sb.Append("<tr><td>").Append(Html(it.Name)).Append("/</td><td>-</td><td></td></tr>"); continue; }
-            sb.Append("<tr><td>").Append(Html(it.Rel)).Append("</td><td>").Append(FilePane.Human(it.Size))
+            sb.Append("<tr><td>").Append(Html(it.Rel)).Append("</td><td>").Append(Fmt.Human(it.Size))
               .Append("</td><td><a href=\"/dl?u=").Append(Uri.EscapeDataString(it.Key))
               .Append(K.Length > 0 ? "&k=" + K : "").Append("\">Descargar</a></td></tr>");
         }

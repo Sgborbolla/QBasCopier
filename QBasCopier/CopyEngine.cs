@@ -91,7 +91,7 @@ public sealed class CopyItem : INotifyPropertyChanged
         }
     }
 
-    public string SizeText => FilePane.Human(TotalBytes);
+    public string SizeText => Fmt.Human(TotalBytes);
 
     public string DestName
     {

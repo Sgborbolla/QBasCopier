@@ -131,13 +131,13 @@ public sealed partial class MainWindow : UserControl
 #endif
             _ = Task.Run(async () =>
             {
-                try { await HistoryStore.AppendAsync(DeviceNameOrHost(), "Transferir (WiFi)", "Recibido: " + name + " (" + FilePane.Human(bytes) + ")", bytes); }
+                try { await HistoryStore.AppendAsync(DeviceNameOrHost(), "Transferir (WiFi)", "Recibido: " + name + " (" + Fmt.Human(bytes) + ")", bytes); }
                 catch { }
             });
             DispatchUi(() =>
             {
                 _trRxBytes += bytes;
-                _lblStatus.Text = "Recibido: " + name + " (" + FilePane.Human(bytes) + ")";
+                _lblStatus.Text = "Recibido: " + name + " (" + Fmt.Human(bytes) + ")";
                 if (_trStatus != null) _trStatus.Text = "Recibido: " + name;
 #if ANDROID
                 if (S.TransferAuto) QBasCopier.Android.DroidCtx.Toast("Recibido: " + name);
@@ -510,13 +510,13 @@ public sealed partial class MainWindow : UserControl
                 var now = Environment.TickCount64;
                 if (now - lastPost < 150) return;
                 lastPost = now;
-                DispatchUi(() => { if (_trStatus != null) _trStatus.Text = "Enviando " + label + ": " + FilePane.Human(done) + (total > 0 ? "/" + FilePane.Human(total) : ""); });
+                DispatchUi(() => { if (_trStatus != null) _trStatus.Text = "Enviando " + label + ": " + Fmt.Human(done) + (total > 0 ? "/" + Fmt.Human(total) : ""); });
             });
             DispatchUi(() => _lblStatus.Text = (ok >= 0 ? "Enviado: " : "Error en: ") + label);
             if (ok >= 0)
             {
                 sent++;
-                try { await HistoryStore.AppendAsync(label, baseUrl, "Enviado por WiFi (" + FilePane.Human(total) + ")", total); } catch { }
+                try { await HistoryStore.AppendAsync(label, baseUrl, "Enviado por WiFi (" + Fmt.Human(total) + ")", total); } catch { }
             }
         }
         if (_trRx != null) _trRx.Text = "Enviados en sesión: " + sent + " archivo(s)";
@@ -1578,7 +1578,7 @@ public sealed partial class MainWindow : UserControl
         var su = string.IsNullOrEmpty(S.SizeUnit) ? "auto" : S.SizeUnit.ToUpperInvariant();
         if (!sizeNames.Contains(su)) su = "auto";
         _cmbSizeUnit = new ComboBox { ItemsSource = sizeNames, SelectedItem = su };
-        _cmbSizeUnit.SelectionChanged += (s, e) => { var v = _cmbSizeUnit.SelectedItem?.ToString() ?? "auto"; S.SizeUnit = v == "auto" ? "" : v; FilePane.SizeUnit = S.SizeUnit; S.Save(); };
+        _cmbSizeUnit.SelectionChanged += (s, e) => { var v = _cmbSizeUnit.SelectedItem?.ToString() ?? "auto"; S.SizeUnit = v == "auto" ? "" : v; Fmt.SizeUnit = S.SizeUnit; S.Save(); };
 
         var addCodes = new[] { "never", "always", "sameSource", "sameDest", "both", "either" };
         _cmbAddWhen = new ComboBox();
@@ -1848,7 +1848,7 @@ public sealed partial class MainWindow : UserControl
         {
             var tp = new StackPanel { Spacing = 2 };
             tp.Children.Add(MkLbl($"{h.Time}  {h.Result}   {h.Source} → {h.Dest}", 12));
-            tp.Children.Add(MkLbl(FilePane.Human(h.DoneBytes), 12).Tint(TextSoft));
+            tp.Children.Add(MkLbl(Fmt.Human(h.DoneBytes), 12).Tint(TextSoft));
             tp.Children.Add(new Border { Background = Line, Height = 1, Margin = new Thickness(0, 2, 0, 0) });
             return tp;
         });
@@ -2046,7 +2046,7 @@ public sealed partial class MainWindow : UserControl
         if (_lblStatus != null) _lblStatus.Text = StatusText();
         if (_cmbLang != null) _cmbLang.SelectedIndex = Ex.IndexOf(S.Lang);
         if (_cmbLangQuick != null) _cmbLangQuick.SelectedIndex = Ex.IndexOf(S.Lang);
-        FilePane.SizeUnit = S.SizeUnit;
+        Fmt.SizeUnit = S.SizeUnit;
         RebuildOptionLists();
     }
 
@@ -2163,7 +2163,7 @@ public sealed partial class MainWindow : UserControl
             _ggBar.Maximum = Math.Max(100, total);
             _ggBar.Value = done;
             _lblProg.Text = pct.ToString("0.0") + "%";
-            _lblRate.Text = L.Get("speed") + ": " + FilePane.Human((long)_lastRate) + "/s";
+            _lblRate.Text = L.Get("speed") + ": " + Fmt.Human((long)_lastRate) + "/s";
             double left = _lastRate > 0 ? (total - done) / _lastRate : 0;
             _lblTime.Text = L.Get("remaining") + ": " + FmtTime(left) + " · " + L.Get("elapsed") + ": " + FmtTime(_batchSw.Elapsed.TotalSeconds);
             var cur = _engine.Items.FirstOrDefault(x => x.State == ItemState.Copying);
@@ -2184,7 +2184,7 @@ public sealed partial class MainWindow : UserControl
 
         if (_trRx != null && _trSrv.Running)
         {
-            _trRx.Text = "Recibidos en sesión: " + FilePane.Human(_trRxBytes);
+            _trRx.Text = "Recibidos en sesión: " + Fmt.Human(_trRxBytes);
             if (NetTools.Now - _trLastFill > 3000) { _trLastFill = NetTools.Now; FillPeers(); }
         }
 

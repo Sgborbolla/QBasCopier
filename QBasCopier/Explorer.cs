@@ -205,7 +205,7 @@ public sealed class Explorer : UserControl
         {
             var sz = new TextBlock
             {
-                Text = FilePane.Human(e.Size),
+                Text = Fmt.Human(e.Size),
                 FontSize = 12,
                 Foreground = TextSoft,
                 VerticalAlignment = VerticalAlignment.Center
@@ -338,7 +338,7 @@ public sealed class Explorer : UserControl
         foreach (Ent e in _list.SelectedItems.OfType<Ent>()) bytes += e.Size;
         _info.Text = n == 0
             ? L.Get("tapToMark")
-            : string.Format(CultureInfo.CurrentCulture, L.Get("markedFmt"), n, FilePane.Human(bytes));
+            : string.Format(CultureInfo.CurrentCulture, L.Get("markedFmt"), n, Fmt.Human(bytes));
     }
 
     private static void ReadDir(string path, List<Ent> into)
