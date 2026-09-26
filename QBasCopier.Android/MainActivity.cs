@@ -233,6 +233,11 @@ public class MainActivity : AvaloniaMainActivity<App>
 
     protected override void OnCreate(Bundle? savedInstanceState)
     {
+        // AvaloniaMainActivity deriva de AppCompatActivity: hay que fijar el tema ANTES de
+        // base.OnCreate, porque AppCompat valida windowActionBar en onPostCreate y sin esto
+        // revienta con "You need to use a Theme.AppCompat theme (or descendant) with this activity".
+        try { SetTheme(Resource.Style.MyTheme); } catch { }
+
         Current = this;
         QBasCopier.TransferHost.ExternalSink = DroidDir.SaveToTree;
         QBasCopier.TransferHost.OpenDoc = DroidList.Open;

@@ -6,16 +6,19 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.qbaswing.qbascopier</ApplicationId>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>1.1</ApplicationDisplayVersion>
     <RootNamespace>QBasCopier</RootNamespace>
     <AssemblyName>QBasCopier</AssemblyName>
-    <AndroidManifest>Properties\AndroidManifest.xml</AndroidManifest>
+    <AndroidManifest>Properties/AndroidManifest.xml</AndroidManifest>
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
-    <AndroidSupportedAbis>arm64-v8a</AndroidSupportedAbis>
+    <!-- arm64 (modernos) + armv7 (viejos/tabletas baratas) + x86_64 (emuladores) = instalable en practicamente todo -->
+    <AndroidSupportedAbis>arm64-v8a;armeabi-v7a;x86_64</AndroidSupportedAbis>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidLinkMode>SdkOnly</AndroidLinkMode>
     <RunAOTCompilation>false</RunAOTCompilation>
+    <ApplicationIcon>mipmap/ic_launcher</ApplicationIcon>
+    <ApplicationRoundIcon>mipmap/ic_launcher_round</ApplicationRoundIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,7 +27,14 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.5" />
     <PackageReference Include="Avalonia.Markup.Xaml.Loader" Version="11.3.5" />
     <PackageReference Include="ZXing.Net" Version="0.16.10" />
-    <AndroidResource Include="Resources\values\styles.xml" />
+    <!-- Version explicita y unica de AppCompat: si el merge trae dos versiones,
+         AppCompatDelegateImpl busca sus attrs (windowActionBar) con indices que no
+         coinciden con la tabla de recursos fusionada y lanza el IllegalStateException
+         "You need to use a Theme.AppCompat theme (or descendant) with this activity". -->
+    <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.7.0.1" />
+    <AndroidResource Include="Resources/values/styles.xml" />
+    <AndroidResource Include="Resources/mipmap-anydpi-v26/ic_launcher.xml" />
+    <AndroidResource Include="Resources/mipmap-anydpi-v26/ic_launcher_round.xml" />
   </ItemGroup>
 
   <ItemGroup>

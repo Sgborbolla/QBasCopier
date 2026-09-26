@@ -8,15 +8,23 @@
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" android:usesPermissionFlags="neverForLocation"/>
   <uses-feature android:name="android.hardware.camera" android:required="false"/>
-  <uses-feature android:name="android.hardware.wifi" android:required="true"/>
-  <application android:label="QBasCopier&amp;Transfer" android:allowBackup="true"
+  <!-- required="false": si fuese true, la Play Store / el instalador bloquea la app
+       en dispositivos sin WiFi (tabletas, algunos emuladores). -->
+  <uses-feature android:name="android.hardware.wifi" android:required="false"/>
+  <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+  <!--
+    NO se declaran <activity> aqui a proposito: los generan los atributos [Activity] de
+    MainActivity.cs, que ademas son los unicos que llevan android:theme y el
+    intent-filter MAIN/LAUNCHER. Declararlos aqui creaba Activities fantasma
+    (com.qbaswing.qbascopier.MainActivity) apuntando a clases inexistentes.
+  -->
+  <application android:label="QBasCopier&amp;Transfer"
                android:theme="@style/MyTheme"
-               android:icon="@mipmap/logo"
+               android:icon="@mipmap/ic_launcher"
+               android:roundIcon="@mipmap/ic_launcher_round"
+               android:allowBackup="true"
                android:usesCleartextTraffic="true"
-               android:roundIcon="@mipmap/logo">
-    <activity android:name=".MainActivity" android:exported="true"
-              android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density"/>
-    <activity android:name=".ScanActivity" android:exported="false"
-              android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|density"/>
-  </application>
+               android:enableOnBackInvokedCallback="false"
+               android:hardwareAccelerated="true"
+               android:largeHeap="true" />
 </manifest>

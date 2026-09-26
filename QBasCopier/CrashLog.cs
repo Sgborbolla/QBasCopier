@@ -69,15 +69,34 @@ public static class CrashLog
                 try
                 {
                     var cr = global::Android.App.Application.Context.ContentResolver!;
-                    var col = new global::Android.Content.ContentValues();
-                    col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, "QBasCopier-crash.txt");
-                    col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, "text/plain");
-                    col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, "Download");
-                    var uri = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
-                    if (uri != null)
-                        using (var os = cr.OpenOutputStream(uri))
-                        using (var w = new StreamWriter(os))
+                    // MediaStore.Downloads solo existe desde Android 10 (API 29). En 9 o menos
+                    // hay que caer a la carpeta publica Download via ruta legacy.
+                    if (global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.Q)
+                    {
+                        var col = new global::Android.Content.ContentValues();
+                        col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, "QBasCopier-crash.txt");
+                        col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, "text/plain");
+                        col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, "Download");
+                        var uri = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
+                        if (uri != null)
+                            using (var os = cr.OpenOutputStream(uri))
+                            using (var w = new StreamWriter(os))
+                                w.Write(full);
+                    }
+                    else
+                    {
+#pragma warning disable CA1422, CS0618
+                        var dl = global::Android.OS.Environment.GetExternalStoragePublicDirectory(
+                            global::Android.OS.Environment.DirectoryDownloads);
+                        if (dl != null && (dl.Mkdirs() || dl.Exists()))
+                        {
+                            var f = new Java.IO.File(dl, "QBasCopier-crash.txt");
+                            using var os = f.OutputStream();
+                            using var w = new StreamWriter(os);
                             w.Write(full);
+                        }
+#pragma warning restore CA1422, CS0618
+                    }
                 }
                 catch { }
 #else

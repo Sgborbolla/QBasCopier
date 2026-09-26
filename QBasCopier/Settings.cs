@@ -55,8 +55,23 @@ public sealed class Settings
     public bool TransferAuto { get; set; }
     public string DeviceName { get; set; } = "";
 
-    [JsonIgnore] public static string Dir =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "QBasCopier");
+    [JsonIgnore] public static string Dir
+    {
+        get
+        {
+#if ANDROID
+            // En Android Environment.SpecialFolder.ApplicationData no siempre devuelve una
+            // ruta escribible, y Settings.Save() se traga la excepcion: los ajustes se
+            // perdian en cada arranque. Se usa la carpeta privada de la app.
+            var files = global::Android.App.Application.Context.FilesDir?.AbsolutePath;
+            return Path.Combine(
+                string.IsNullOrWhiteSpace(files) ? Path.GetTempPath() : files,
+                "QBasCopier");
+#else
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "QBasCopier");
+#endif
+        }
+    }
 
     [JsonIgnore] public static string ConfigPath => Path.Combine(Dir, "settings.json");
 
