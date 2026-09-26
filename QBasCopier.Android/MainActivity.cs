@@ -539,9 +539,9 @@ public class MainActivity : AvaloniaMainActivity<App>
             if (_pm == null) return;
             if (_wake == null)
             {
-                // 1 = PARTIAL_WAKE_LOCK. Se usa el literal porque el nombre simbolico
-                // no existe en el binding de .NET para Android.
-                _wake = _pm.NewWakeLock(1, "QBasCopier:transfer");
+                // 1 = PARTIAL_WAKE_LOCK. Se usa el valor numerico porque el nombre del
+                // enum no aparece en el binding de .NET para Android.
+                _wake = _pm.NewWakeLock((global::Android.OS.WakeLockFlags)1, "QBasCopier:transfer");
                 _wake.SetReferenceCounted(false);
             }
             if (!_wake.IsHeld) _wake.Acquire(6L * 60 * 60 * 1000);   // 6 h
