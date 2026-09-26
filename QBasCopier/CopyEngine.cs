@@ -54,10 +54,24 @@ public sealed class CopyItem : INotifyPropertyChanged
     public string SpeedText { get => _speed; set { _speed = value; On(nameof(SpeedText)); } }
 
     private string _conflictInfo = "";
-    public string ConflictInfo { get => _conflictInfo; set => On(nameof(ConflictInfo)); }
+    public string ConflictInfo { get => _conflictInfo; set { _conflictInfo = value; On(nameof(ConflictInfo)); } }
 
     /// <summary>Reintentos ya gastados, para no reintentar un error de forma infinita.</summary>
     public int Retries { get; set; }
+
+    /// <summary>Reavisa todos los datos visibles: lo llama la UI al renombrar o recargar.</summary>
+    public void RaiseAll()
+    {
+        On(nameof(Name));
+        On(nameof(SizeText));
+        On(nameof(SourcePath));
+        On(nameof(DestPath));
+        On(nameof(DestName));
+        On(nameof(Percent));
+        On(nameof(StateText));
+        On(nameof(SpeedText));
+        On(nameof(IsDirectory));
+    }
 
     /// <summary>
     /// Nombre real del origen. Para content:// hay que preguntarlo al ContentResolver:
@@ -120,6 +134,20 @@ public sealed class CopyEngine
 
     public long TotalBytes { get => Interlocked.Read(ref _totalBytes); }
     public long DoneBytes { get => Interlocked.Read(ref _doneBytes); }
+
+    /// <summary>
+    /// Progreso de toda la cola, no de un elemento. Es lo que ve el usuario en la
+    /// barra global y en el tooltip de la bandeja cuando solo hay una ventana.
+    /// Se lee con Interlocked porque los hilos workers van sumando mientras se lee.
+    /// </summary>
+    public double OverallPercent
+    {
+        get
+        {
+            var t = TotalBytes;
+            return t > 0 ? Math.Min(100, DoneBytes * 100.0 / t) : 0;
+        }
+    }
 
     public event Action<CopyItem>? ItemStatus;      // per-file refresh
     public event Action? TotalsChanged;             // speed/totals refresh

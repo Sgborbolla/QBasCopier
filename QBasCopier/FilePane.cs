@@ -133,11 +133,41 @@ public sealed class FilePane : UserControl
         Content = grid;
     }
 
+    /// <summary>
+    /// En pantallas estrechas se ocultan las columnas de fecha y tipo. Con las cinco
+    /// columnas fijas (28+90+130+110 = 358 px) cada panel del doble explorador se
+    /// salia de la pantalla en un movil de 360 dp y no se veia ni el nombre.
+    /// </summary>
+    private bool _narrow;
+
+    public void SetNarrow(bool narrow)
+    {
+        if (_narrow == narrow) return;
+        _narrow = narrow;
+        Rebuild();
+    }
+
+    /// <summary>Relee la carpeta actual. Necesario tras cambiar el ancho de las columnas.</summary>
+    public void Rebuild()
+    {
+        var cur = CurrentPath;
+        if (string.IsNullOrEmpty(cur)) return;
+        try { Navigate(cur); } catch { }
+    }
+
     private Control BuildRow(PaneEntry e)
     {
         var grid = new Grid
         {
-            ColumnDefinitions = { new ColumnDefinition(new GridLength(28)), new ColumnDefinition(GridLength.Star), new ColumnDefinition(new GridLength(90)), new ColumnDefinition(new GridLength(130)), new ColumnDefinition(new GridLength(110)) }
+            ColumnDefinitions = _narrow
+                ? new ColumnDefinition(new GridLength(24)),
+                  new ColumnDefinition(GridLength.Star),
+                  new ColumnDefinition(new GridLength(72))
+                : new ColumnDefinition(new GridLength(28)),
+                  new ColumnDefinition(GridLength.Star),
+                  new ColumnDefinition(new GridLength(90)),
+                  new ColumnDefinition(new GridLength(130)),
+                  new ColumnDefinition(new GridLength(110))
         };
         var glyph = new TextBlock { Text = e.IsDir ? "▸" : "", VerticalAlignment = VerticalAlignment.Center };
         glyph.Foreground = e.IsDir ? DirBrush : BrushesFrom("#3352A8");
@@ -158,6 +188,8 @@ public sealed class FilePane : UserControl
         var size = new TextBlock { Text = e.SizeText, Foreground = TextMain, HorizontalAlignment = HorizontalAlignment.Right };
         Grid.SetColumn(size, 2);
         grid.Children.Add(size);
+
+        if (_narrow) return grid;
 
         var mod = new TextBlock { Text = e.Modified, Foreground = BrushesFrom("#9FB3E8") };
         Grid.SetColumn(mod, 3);

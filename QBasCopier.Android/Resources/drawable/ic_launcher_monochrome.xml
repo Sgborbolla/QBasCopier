@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icono monocromo (Android 13+, iconos con tema): el lanzador lo tiñe con el
+  color del sistema, asi que las dos flechas van en un solo color sobre
+  transparente. Mismas formas y misma zona segura que el foreground de color.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108"
+    android:tint="#FFFFFF">
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M28,36h42v-9l16,13l-16,13v-9h-42z" />
+  <path
+      android:fillColor="#FFFFFF"
+      android:pathData="M80,72h-42v9l-16,-13l16,-13v9h42z" />
+</vector>

@@ -635,5 +635,72 @@ public static class L
           "Tüm hakları saklıdır", "جميع الحقوق محفوظة", "版权所有",
           "無断転載禁止", "판권 소유", "सर्वाधिकार सुरक्षित", "Hak cipta dilindungi",
           "Med ensamrätt", "Kaikki oikeudet pidätetään", "Všechna práva vyhrazena", "สงวนลิขสิทธิ์");
+
+        // ---- Interfaz nueva: barra de menus, barra de comandos y barra individual ----
+        A("menuFile", "File", "Archivo", "Arquivo", "Fichier", "Datei", "File",
+          "Bestand", "Plik", "Файл", "Dosya", "ملف", "文件",
+          "ファイル", "파일", "फ़ाइल", "Berkas", "Fil", "Tiedosto", "Soubor", "ไฟล์");
+        A("menuEdit", "Edit", "Edición", "Edição", "Édition", "Bearbeiten", "Modifica",
+          "Bewerken", "Edytuj", "Редактировать", "Düzenle", "تحرير", "编辑",
+          "編集", "편집", "संपादित करें", "Sunting", "Redigera", "Muokkaa", "Upravit", "แก้ไข");
+        A("menuView", "View", "Ver", "Ver", "Affichage", "Ansicht", "Visualizza",
+          "Weergave", "Widok", "Вид", "Görünüm", "عرض", "视图",
+          "表示", "보기", "दृश्य", "Tampilan", "Vy", "Näkymä", "Pohled", "มุมมอง");
+        A("menuTools", "Tools", "Herramientas", "Ferramentas", "Outils", "Werkzeuge", "Strumenti",
+          "Extra's", "Narzędzia", "Инструменты", "Araçlar", "أدوات", "工具",
+          "ツール", "도구", "उपकरण", "Alat", "Verktyg", "Työkalut", "Nástroje", "เครื่องมือ");
+        A("menuHelp", "Help", "Ayuda", "Ajuda", "Aide", "Hilfe", "Aiuto",
+          "Help", "Pomoc", "Справка", "Yardım", "مساعدة", "帮助",
+          "ヘルプ", "도움말", "मदद", "Bantuan", "Hjälp", "Ohje", "Nápověda", "ช่วยเหลือ");
+
+        A("transfer", "Transfer", "Transferir", "Transferir", "Transférer", "Übertragen", "Trasferisci",
+          "Overdragen", "Transferuj", "Передать", "Aktar", "نقل", "传输",
+          "転送", "전송", "स्थानांतरण", "Transfer", "Överför", "Siirrä", "Přenos", "ถ่ายโอน");
+        A("warning", "Warning", "Advertencia", "Aviso", "Avertissement", "Warnung", "Avviso",
+          "Waarschuwing", "Ostrzeżenie", "Предупреждение", "Uyarı", "تحذير", "警告",
+          "警告", "경고", "चेतावनी", "Peringatan", "Varning", "Varoitus", "Varování", "คำเตือน");
+        A("sSpeed", "Speed", "Velocidad", "Velocidade", "Vitesse", "Geschwindigkeit", "Velocità",
+          "Snelheid", "Szybkość", "Скорость", "Hız", "السرعة", "速度",
+          "速度", "속도", "गति", "Kecepatan", "Hastighet", "Nopeus", "Rychlost", "ความเร็ว");
+        A("sPerformance", "Performance", "Rendimiento", "Desempenho", "Performance", "Leistung", "Prestazioni",
+          "Prestaties", "Wydajność", "Производительность", "Performans", "الأداء", "性能",
+          "パフォーマンス", "성능", "प्रदर्शन", "Kinerja", "Prestanda", "Suorituskyky", "Výkon", "ประสิทธิภาพ");
+        A("sExplorer", "File manager", "Explorador", "Explorador", "Explorateur", "Explorer", "Esplora risorse",
+          "Verkenner", "Eksplorator", "Проводник", "Dosya Gezgini", "مستكشف الملفات", "文件管理器",
+          "エクスプローラー", "파일 탐색기", "फ़ाइल प्रबंधक", "Pengelola Berkas", "Filhanterare", "Tiedostonhallinta", "Správce souborů", "ตัวจัดการไฟล์");
+        A("tabCopy", "Copy", "Copiar", "Copiar", "Copier", "Kopieren", "Copia",
+          "Kopieren", "Kopiuj", "Копировать", "Kopyala", "نسخ", "复制",
+          "コピー", "복사", "कॉपी", "Salin", "Kopiera", "Kopioi", "Kopírovat", "คัดลอก");
+        A("tabTransfer", "Transfer", "Transferir", "Transferir", "Transférer", "Übertragen", "Trasferisci",
+          "Overdragen", "Transferuj", "Передать", "Aktar", "نقل", "传输",
+          "転送", "전송", "स्थानांतरण", "Transfer", "Överför", "Siirrä", "Přenos", "ถ่ายโอน");
+        A("tabAbout", "About", "Acerca de", "Sobre", "À propos", "Über", "Informazioni",
+          "Over", "O programie", "О программе", "Hakkında", "حول", "关于",
+          "概要", "정보", "परिचय", "Tentang", "Om", "Tietoja", "O aplikaci", "เกี่ยวกับ");
+
+        A("selectAll", "Select all", "Seleccionar todo", "Selecionar tudo", "Tout sélectionner", "Alle auswählen", "Seleziona tutto",
+          "Alles selecteren", "Zaznacz wszystko", "Выбрать все", "Tümünü seç", "تحديد الكل", "全选",
+          "すべて選択", "모두 선택", "सभी चुनें", "Pilih semua", "Markera alla", "Valitse kaikki", "Vybrat vše", "เลือกทั้งหมด");
+        A("deselectAll", "Deselect", "Deseleccionar", "Desmarcar", "Désélectionner", "Abwählen", "Deseleziona",
+          "Deselecteren", "Odznacz wszystko", "Снять выделение", "Seçimi kaldır", "إلغاء التحديد", "取消选择",
+          "選択解除", "선택 해제", "चयन हटाएँ", "Batalkan pilih", "Avmarkera inte", "Poista valinta", "Zrušit výběr", "ยกเลิกการเลือก");
+        A("removeFromList", "Remove from list", "Quitar de la lista", "Remover da lista", "Retirer de la liste", "Aus der Liste entfernen", "Rimuovi dalla lista",
+          "Uit lijst verwijderen", "Usuń z listy", "Убрать из списка", "Listeden çıkar", "إزالة من القائمة", "从列表移除",
+          "リストから削除", "목록에서 제거", "सूची से हटाएँ", "Hapus dari daftar", "Ta bort från listan", "Poista luettelosta", "Odebrat ze seznamu", "ลบออกจากรายการ");
+        A("delete", "Delete", "Eliminar", "Excluir", "Supprimer", "Löschen", "Elimina",
+          "Verwijderen", "Usuń", "Удалить", "Sil", "حذف", "删除",
+          "削除", "삭제", "हटाएँ", "Hapus", "Ta bort", "Poista", "Smazat", "ลบ");
+        A("openFolder", "Open folder", "Abrir carpeta", "Abrir pasta", "Ouvrir le dossier", "Ordner öffnen", "Apri cartella",
+          "Map openen", "Otwórz folder", "Открыть папку", "Klasörü aç", "فتح المجلد", "打开文件夹",
+          "フォルダーを開く", "폴더 열기", "फ़ोल्डर खोलें", "Buka folder", "Öppna mapp", "Avaa kansio", "Otevřít složku", "เปิดโฟลเดอร์");
+        A("reverseList", "Reverse order", "Invertir orden", "Inverter ordem", "Inverser l'ordre", "Reihenfolge umkehren", "Inverti ordine",
+          "Volgorde omkeren", "Odwróć kolejność", "Обратный порядок", "Sırayı ters çevir", "عكس الترتيب", "反转顺序",
+          "順序を逆にする", "순서 뒤집기", "क्रम उलटें", "Balik urutan", "Vänd ordning", "Käännä järjestys", "Obrátit pořadí", "กลับลำดับ");
+        A("oneCopy", "Copy this", "Copiar este", "Copiar este", "Copier celui-ci", "Diese kopieren", "Copia questo",
+          "Deze kopiëren", "Kopiuj ten", "Скопировать этот", "Bunu kopyala", "نسخ هذا", "复制这个",
+          "これをコピー", "이것 복사", "इसे कॉपी करें", "Salin ini", "Kopiera den här", "Kopioi tämä", "Kopírovat tento", "คัดลอกรายการนี้");
+        A("oneMove", "Move this", "Mover este", "Mover este", "Déplacer celui-ci", "Diese verschieben", "Sposta questo",
+          "Deze verplaatsen", "Przenieś ten", "Переместить этот", "Bunu taşı", "نقل هذا", "移动这个",
+          "これを移動", "이것 이동", "इसे ले जाएँ", "Pindahkan ini", "Flytta den här", "Siirrä tämä", "Přesunout tento", "ย้ายรายการนี้");
     }
 }

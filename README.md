@@ -18,7 +18,7 @@ agua "QBasCopier © 2026" de QBasWinG.
 | `QBasCopier.Android\` | Proyecto Android (APK) |
 | `build.bat` | **Windows**: doble clic -> `dist\Windows\` |
 | `build.sh` | **Linux/macOS**: portátil -> `dist\Linux\` o `dist\macOS\` |
-| `make-app.sh` | **macOS**: bundle `dist/macOS/QBasCopier-y-Transfer.app` |
+| `make-app.sh` | **macOS**: bundle `dist/macOS/QBasWing-Shuttle.app` |
 | `install-desktop.sh` | Linux: menú, icono y Scripts de Nautilus (Copiar/Mover) |
 | `build-android.sh` | Android: APK (requiere workload `android`) |
 
@@ -29,8 +29,8 @@ agua "QBasCopier © 2026" de QBasWinG.
 build.bat        → doble clic (o desde cmd)
 ```
 Resultado en `dist\Windows\`:
-- `QBasCopier-y-Transfer.exe` — portátil (se copia a cualquier Windows x64 y funciona)
-- `QBasCopier-y-Transfer Setup.exe` — instalador con selector de idioma y música
+- `QBasWing-Shuttle.exe` — portátil (se copia a cualquier Windows x64 y funciona)
+- `QBasWing-Shuttle Setup.exe` — instalador con selector de idioma y música
 
 ### Linux
 ```
@@ -41,7 +41,7 @@ Resultado en `dist\Windows\`:
 ### macOS
 ```
 ./make-app.sh osx-arm64   # Apple Silicon  (o osx-x64 en Intel)
-# → dist/macOS/QBasCopier-y-Transfer.app
+# → dist/macOS/QBasWing-Shuttle.app
 ```
 
 ### Android (celular)
@@ -55,7 +55,7 @@ publica el pack host Mono de Linux necesario para compilar en la nube).
 
 #### Obtener el APK SIN PC (github.com, gratis)
 1. Crea un repositorio en GitHub y sube el contenido de este ZIP.
-2. Entra en la pestaña **Actions** → workflow **"Compilar APK QBasCopier"**.
+2. Entra en la pestaña **Actions** → workflow **"Compilar APK QBasWing Shuttle"**.
 3. Pulss **Run workflow** (o deja que corra solo al subir).
 4. Al terminar abre el artefacto **QBasCopier-apk**, descarga el `.apk`.
 5. Compártelo con cualquiera (Android pedirá "permitir fuentes desconocidas").

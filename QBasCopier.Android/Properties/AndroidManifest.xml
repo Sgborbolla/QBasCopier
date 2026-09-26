@@ -26,7 +26,25 @@
     intent-filter MAIN/LAUNCHER. Declararlos aqui creaba Activities fantasma
     (com.qbaswing.qbascopier.MainActivity) apuntando a clases inexistentes.
   -->
-  <application android:label="QBasCopier y Transfer"
+
+  <!--
+    El servicio en primer plano es lo unico que Android respeta para seguir
+    copiando con la pantalla apagada: sin el, el sistema mata el proceso en
+    segundo plano aunque se pida WakeLock y la copia se queda a medias.
+    FOREGROUND_SERVICE (API 28+) y FOREGROUND_SERVICE_DATA_SYNC (API 34+, donde
+    Android 14 separa por tipo) son obligatorios a partir de esas versiones.
+    POST_NOTIFICATIONS (API 33+) es lo que hace que se vea la notificacion y
+    RECEIVE_BOOT_COMPLETED deja pendiente una copia si el telefono se apaga.
+    Ojo: los <uses-permission> van como hijos directos de <manifest>, nunca
+    dentro de <application>, que es donde se habian puesto al principio y
+    hacia fallar la build.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+
+  <application android:label="QBasWing Shuttle · QBasCopier y Transfer"
                android:theme="@style/MyTheme"
                android:icon="@mipmap/ic_launcher"
                android:roundIcon="@mipmap/ic_launcher_round"
@@ -34,5 +52,27 @@
                android:usesCleartextTraffic="true"
                android:enableOnBackInvokedCallback="false"
                android:hardwareAccelerated="true"
-               android:largeHeap="true" />
+               android:largeHeap="true">
+
+    <!--
+      El servicio en primer plano es lo unico que Android respeta para seguir
+      copiando con la pantalla apagada: sin el, el sistema mata el proceso en
+      segundo plano aunque se pida WakeLock y la copia se queda a medias.
+    -->
+    <service
+        android:name=".CopyService"
+        android:exported="false"
+        android:foregroundServiceType="dataSync" />
+
+    <!-- Para abrir una carpeta o un archivo con otra app sin pedir permisos. -->
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="${applicationId}.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/file_paths" />
+    </provider>
+  </application>
 </manifest>

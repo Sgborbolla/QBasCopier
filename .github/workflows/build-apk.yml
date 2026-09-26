@@ -1,4 +1,4 @@
-name: Compilar APK QBasCopier
+name: Compilar APK QBasWing Shuttle
 
 on:
   workflow_dispatch:          # boton "Run workflow" en la pestana Actions
@@ -42,7 +42,7 @@ jobs:
       - name: Subir el APK como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: QBasCopier-y-Transfer-v1.2-apk
+          name: QBasWing-Shuttle-v1.2-apk
           path: QBasCopier.Android/bin/Release/net8.0-android*/*.apk
           if-no-files-found: error
 
@@ -54,10 +54,10 @@ jobs:
           apk=$(ls QBasCopier.Android/bin/Release/net8.0-android*/*.apk | head -1)
           # El nombre ya no lleva "&" (lo convertia GitHub en "." al publicar el
           # asset), asi que el archivo de release y el local son el mismo:
-          # QBasCopier-y-Transfer-v1.2.apk
-          cp "$apk" "QBasCopier-y-Transfer-v1.2.apk"
+          # QBasWing-Shuttle-v1.2.apk
+          cp "$apk" "QBasWing-Shuttle-v1.2.apk"
           gh release delete v1.2-apk --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create v1.2-apk "QBasCopier-y-Transfer-v1.2.apk" --title "QBasCopier y Transfer 1.2" --notes "Version Android para celular. Compilada con GitHub Actions."
+          gh release create v1.2-apk "QBasWing-Shuttle-v1.2.apk" --title "QBasWing Shuttle · QBasCopier y Transfer 1.2" --notes "Version Android para celular. Compilada con GitHub Actions."
 
   # ---------------------------------------------------------------- escritorio
   # El .exe de PC es un entregable aparte: mismo codigo, otro TFM (net10.0) y otro SDK.
@@ -84,16 +84,16 @@ jobs:
       - name: Empaquetar en ZIP
         run: |
           set -e
-          cp dist/windows/QBasCopier.exe "dist/windows/QBasCopier-y-Transfer.exe"
-          cd dist && zip -q -r "../QBasCopier-y-Transfer-v1.2-win-x64.zip" windows
+          cp dist/windows/QBasCopier.exe "dist/windows/QBasWing-Shuttle.exe"
+          cd dist && zip -q -r "../QBasWing-Shuttle-v1.2-win-x64.zip" windows
           cd ..
-          ls -la QBasCopier-y-Transfer-v1.2-win-x64.zip
+          ls -la QBasWing-Shuttle-v1.2-win-x64.zip
 
       - name: Subir el .exe como artefacto
         uses: actions/upload-artifact@v4
         with:
-          name: QBasCopier-y-Transfer-v1.2-win-x64
-          path: QBasCopier-y-Transfer-v1.2-win-x64.zip
+          name: QBasWing-Shuttle-v1.2-win-x64
+          path: QBasWing-Shuttle-v1.2-win-x64.zip
           if-no-files-found: error
 
       - name: Publicar el .exe en un release
@@ -102,6 +102,6 @@ jobs:
         run: |
           set -e
           gh release delete v1.2-win --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create v1.2-win "QBasCopier-y-Transfer-v1.2-win-x64.zip" \
-            --title "QBasCopier y Transfer 1.2 para Windows" \
-            --notes "Portable de 64 bits. Descomprime y ejecuta QBasCopier-y-Transfer.exe. No necesita instalar nada."
+          gh release create v1.2-win "QBasWing-Shuttle-v1.2-win-x64.zip" \
+            --title "QBasWing Shuttle · QBasCopier y Transfer 1.2 para Windows" \
+            --notes "Portable de 64 bits. Descomprime y ejecuta QBasWing-Shuttle.exe. No necesita instalar nada."

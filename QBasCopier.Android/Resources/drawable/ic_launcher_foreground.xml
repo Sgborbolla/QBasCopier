@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  La marca: dos flechas en sentidos contrarios.
+
+  Copia y transfer van en los dos sentidos, asi que la flecha va y viene. Va
+  centrada en la zona segura de 66x66 (de 24 a 84 de los 108) para que ningun
+  lanzador la recorte, y en dorado sobre el azul de la bandera.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Flecha de arriba, hacia la derecha. -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M28,36h42v-9l16,13l-16,13v-9h-42z" />
+
+    <!-- Flecha de abajo, hacia la izquierda. -->
+    <path
+        android:fillColor="#F6F8FF"
+        android:pathData="M80,72h-42v9l-16,-13l16,-13v9h42z" />
+</vector>

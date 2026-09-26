@@ -1,11 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
   <!--
-    AvaloniaMainActivity deriva de AppCompatActivity. AppCompat valida en onPostCreate
-    que el tema traiga windowActionBar; si el estilo no es descendiente de Theme.AppCompat
-    (o su parent no resuelve tras el merge de recursos) revienta con:
-      "You need to use a Theme.AppCompat theme (or descendant) with this activity."
-    Por eso el estilo se declara aqui de forma explicita y MainActivity.OnCreate tambien
-    hace SetTheme(Resource.Style.MyTheme) antes de base.OnCreate.
+    Pantalla completa de verdad. Sin esto la app abre con la barra de estado y la
+    de navegacion encima, y en un movil queda una franja negra arriba y otra abajo.
+
+    WindowLayoutInDisplayCutoutMode=shortEdges: en las ›
+    pantallas con notch la app llega hasta el borde y dibuja debajo, en vez de
+    dejar un recuadro negro.
+    Se queda en shortEdges y no en always para no tapar la barra de estado en los
+   moviles sin recorte, donde quedaria raro.
   -->
   <style name="MyTheme" parent="Theme.AppCompat.NoActionBar">
     <item name="windowActionBar">false</item>
@@ -13,5 +16,20 @@
     <item name="windowActionModeOverlay">true</item>
     <item name="android:windowBackground">@android:color/black</item>
     <item name="android:windowDisablePreview">true</item>
+    <item name="android:windowFullscreen">true</item>
+    <item name="android:windowContentOverlay">@null</item>
+    <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+    <item name="android:navigationBarColor">#FF04102E</item>
+    <item name="android:statusBarColor">#FF04102E</item>
+    <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+  </style>
+
+  <!--
+    Tema del servicio en primer plano. Sin barra de accion propia: el servicio
+    no pinta interfaz, solo sostiene la notificacion.
+  -->
+  <style name="CopyServiceTheme" parent="Theme.AppCompat.NoActionBar">
+    <item name="windowActionBar">false</item>
+    <item name="windowNoTitle">true</item>
   </style>
 </resources>

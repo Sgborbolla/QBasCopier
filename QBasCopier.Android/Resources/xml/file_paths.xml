@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Carpetas que la app puede compartir con otras apps al abrir un archivo o una
+  carpeta. Es lo que permite "Abrir carpeta" y "Abrir archivo" sin pedir permiso
+  de almacenamiento: se pasa el archivo por un FileProvider en vez de por una
+  ruta suelta.
+-->
+<paths>
+    <external-path name="externo" path="." />
+    <external-files-path name="externo_app" path="." />
+    <files-path name="interno_app" path="." />
+    <cache-path name="cache" path="." />
+    <root-path name="raiz" path="/" />
+</paths>

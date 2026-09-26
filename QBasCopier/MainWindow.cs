@@ -65,13 +65,28 @@ public sealed partial class MainWindow : UserControl
     private Button _bIntegrate = null!, _bFold = null!, _bQuit = null!;
     private ListBox _lbQueue = null!, _lbErrs = null!, _lbHist = null!;
     private FilePane _left = null!, _right = null!;
-    private ComboBox _cmbLang = null!, _cmbLangQuick = null!, _cmbAfter = null!, _cmbEngine = null!, _cmbCollision = null!, _cmbError = null!, _cmbPriority = null!, _cmbBuffer = null!, _cmbSizeUnit = null!, _cmbAddWhen = null!;
+    private WrapPanel _cmdBar = null!;
+    private StackPanel _oneBar = null!;
+    private Border _oneBox = null!;
+    private TextBlock _oneLbl = null!;    private ComboBox _cmbLang = null!, _cmbLangQuick = null!, _cmbAfter = null!, _cmbEngine = null!, _cmbCollision = null!, _cmbError = null!, _cmbPriority = null!, _cmbBuffer = null!, _cmbSizeUnit = null!, _cmbAddWhen = null!;
     private TextBox _tbBuffer = null!, _tbRetry = null!, _tbSpeed = null!, _tbUpdate = null!, _tbAvg = null!, _tbThrottle = null!, _tbWarn = null!, _tbNewPat = null!;
     private Slider _sldThreads = null!, _sldSpeed = null!;
     private TextBlock _lblThreads = null!, _lblSpeed = null!;
     private CheckBox _chkTray = null!, _chkStart = null!, _chkAttrib = null!, _chkSec = null!, _chkDel = null!, _chkKeep = null!, _chkRO = null!, _chkHidden = null!, _chkTitle = null!, _chkLimit = null!, _chkVerify = null!, _chkActivate = null!, _chkAskAdd = null!, _chkLog = null!;
 
-    private const string TabExplorer = "explorer", TabQueue = "queue", TabErrors = "errors", TabOptions = "options", TabHistory = "history", TabTransfer = "transfer";
+    /// <summary>Version que se muestra en Acerca de; la del manifiesto va aparte.</summary>
+    public const string AppVersion = "1.2.0";
+
+    /// <summary>Nombre corto de la app, el que va en el icono y en lostitulares.</summary>
+    public const string AppName = "QBasWing Shuttle";
+
+    /// <summary>
+    /// Nombre completo. En la barra superior, la marca de agua, el pie y Acerca de
+    /// siempre sale el nombre entero, no la abreviatura.
+    /// </summary>
+    public const string AppFullName = AppName + " · QBasCopier y Transfer";
+
+    private const string TabCopy = "copy", TabTransfer = "transfer", TabOptions = "options", TabHistory = "history", TabAbout = "about";
     private const string AboutText =
         "QBasCopier y Transfer crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
         "que nació de las manos del Dr. Sergio Grabiel Borbolla Verdecia. Desde Cuba, con el corazón " +
@@ -754,17 +769,228 @@ public sealed partial class MainWindow : UserControl
     private void BuildWindow()
     {
         var root = this.FindControl<Grid>("Root");
+        // Cinco filas: barra superior, barra de menus, contenido, barra de comandos y
+        // pie. La barra de comandos va arriba del pie y no dentro de la pestana para
+        // que Copiar y Mover esten siempre a la vista y al alcance del pulgar, que es
+        // lo unico que se usa de verdad.
         var main = new Grid
         {
-            RowDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) }
+            RowDefinitions =
+            {
+                new(GridLength.Auto),   // 0 barra superior
+                new(GridLength.Auto),   // 1 menus
+                new(GridLength.Star),   // 2 contenido
+                new(GridLength.Auto),   // 3 barra de comandos
+                new(GridLength.Auto)    // 4 pie
+            }
         };
-        main.Children.Add(BuildToolbar());
-        main.Children.Add(BuildBody());
-        main.Children.Add(BuildStatusbar());
-        Grid.SetRow(main.Children[0] as Control, 0);
-        Grid.SetRow(main.Children[1] as Control, 1);
-        Grid.SetRow(main.Children[2] as Control, 2);
+        var r0 = BuildToolbar();
+        var r1 = BuildMenuBar();
+        var r2 = BuildBody();
+        var r3 = BuildCommandBar();
+        var r4 = BuildStatusbar();
+        Grid.SetRow(r0, 0); main.Children.Add(r0);
+        Grid.SetRow(r1, 1); main.Children.Add(r1);
+        Grid.SetRow(r2, 2); main.Children.Add(r2);
+        Grid.SetRow(r3, 3); main.Children.Add(r3);
+        Grid.SetRow(r4, 4); main.Children.Add(r4);
         root.Children.Add(main);
+    }
+
+    /// <summary>
+    /// Barra de menus al estilo de los gestores de archivos: se lee de un vistazo y
+    /// en un movil se colapsa detras de un boton para no robar alto.
+    /// </summary>
+    private Control BuildMenuBar()
+    {
+        var bar = new Border
+        {
+            Background = BgPanel,
+            BorderBrush = Line,
+            BorderThickness = new Thickness(0, 1, 0, 1),
+            Padding = new Thickness(6, 2)
+        };
+        var strip = new WrapPanel { Orientation = Orientation.Horizontal };
+        bar.Child = strip;
+
+        void Menu(string icon, string key, params (string Ico, string Text, Action Go)[] items)
+        {
+            var b = new Button
+            {
+                Content = Ico.Btn(icon, L.Get(key), TextSoft, 17, 12.5),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(10, 5, 10, 5),
+                MinHeight = 34,
+                CornerRadius = new CornerRadius(7)
+            };
+            b.Click += (_, _) => OpenMenuSheet(icon, key, items);
+            strip.Children.Add(b);
+        }
+
+        Menu("file", "menuFile",
+            ("addFiles", "addFiles", () => PickFiles()),
+            ("addFolder", "addFolder", () => PickDirInto(_tbFrom)),
+            ("selectAll", "selectAll", () => SelectAllQueue()),
+            ("clear", "clear", () => Clear()));
+
+        Menu("table", "menuEdit",
+            ("copy", "copy", () => _ = StartCopy(false)),
+            ("move", "move", () => _ = StartCopy(true)),
+            ("rename", "rename", () => RenameSelected()),
+            ("trash", "delUnfinished", () => DeleteSelected()));
+
+        Menu("eye", "menuView",
+            ("fold", "fold", () => ToggleFold()),
+            ("integrate", "integrate", () => ToggleIntegration()));
+
+        Menu("gear", "menuTools",
+            ("transfer", "tabTransfer", () => GoTab(TabTransfer)),
+            ("options", "tabInterface", () => GoTab(TabOptions)),
+            ("history", "tabHistory", () => GoTab(TabHistory)),
+            ("about", "tabAbout", () => GoTab(TabAbout)));
+
+        Menu("info", "menuHelp",
+            ("about", "tabAbout", () => GoTab(TabAbout)),
+            ("quit", "quit", () => DoQuit()));
+
+        // En pantallas estrechas se deja solo la primera barra y el resto se abre
+        // desde el boton de la derecha, para que la fila de menus no ocupe dos lineas.
+        var bMore = new Button
+        {
+            Content = Ico.Get("chevronDown", 20, TextSoft),
+            Background = Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            MinWidth = 38,
+            MinHeight = 34,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            IsVisible = false,
+            CornerRadius = new CornerRadius(7)
+        };
+        var outer = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) } };
+        Grid.SetColumn(bar, 0);
+        outer.Children.Add(bar);
+        Grid.SetColumn(bMore, 1);
+        outer.Children.Add(bMore);
+        bMore.Click += (_, _) => OpenMenuSheet("list", "menuTools",
+            ("transfer", "tabTransfer", () => GoTab(TabTransfer)),
+            ("options", "tabInterface", () => GoTab(TabOptions)),
+            ("history", "tabHistory", () => GoTab(TabHistory)),
+            ("about", "tabAbout", () => GoTab(TabAbout)),
+            ("quit", "quit", () => DoQuit()));
+        bar.Classes.Add("menuBar");
+        outer.SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width > 0 && e.NewSize.Width < 560;
+            bMore.IsVisible = narrow;
+            bar.IsVisible = !narrow;
+        };
+        return outer;
+    }
+
+    private void GoTab(string tag)
+    {
+        if (_tabs == null) return;
+        foreach (var o in _tabs.Items)
+            if (o is TabItem ti && ti.Tag?.ToString() == tag)
+            { _tabs.SelectedItem = ti; return; }
+    }
+
+    /// <summary>Hoja emergente con los itens de un menu, para el toque en movil.</summary>
+    private void OpenMenuSheet(string icon, string key, (string Ico, string Text, Action Go)[] items)
+    {
+        var list = new StackPanel { Spacing = 2, Width = 240 };
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(2, 2, 2, 8) };
+        head.Children.Add(Ico.Get(icon, 20, Gold));
+        head.Children.Add(new TextBlock { Text = L.Get(key), FontWeight = FontWeight.Bold, Foreground = TextMain, FontSize = 14, VerticalAlignment = VerticalAlignment.Center });
+        list.Children.Add(head);
+        foreach (var it in items)
+        {
+            var go = it.Go;
+            var b = new Button
+            {
+                Content = Ico.Btn(it.Ico, L.Get(it.Text), TextMain, 18, 13),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Padding = new Thickness(10, 8, 10, 8),
+                MinHeight = 40,
+                CornerRadius = new CornerRadius(7)
+            };
+            b.Click += (_, _) => { CloseSheet(); go(); };
+            list.Children.Add(b);
+        }
+        OpenSheet(new Border
+        {
+            Background = BgDeep,
+            BorderBrush = Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(8),
+            Child = list
+        });
+    }
+
+    /// <summary>
+    /// Barra de comandos: los botones que de verdad se usan, grandes y con icono.
+    /// Es un WrapPanel para que en un movil estrecho pase a dos lineas en vez de
+    /// recortar los ultimos botones.
+    /// </summary>
+    private Control BuildCommandBar()
+    {
+        var box = new Border
+        {
+            Background = BgPanel,
+            BorderBrush = Line,
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            Padding = new Thickness(6, 5)
+        };
+        _cmdBar = new WrapPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        box.Child = _cmdBar;
+
+        Button Big(string icon, string key, Action go, string style = "")
+        {
+            var b = new Button
+            {
+                Content = Ico.Btn(icon, L.Get(key), style == "primary" ? Gold : TextMain, 22, 12),
+                Background = style == "primary" ? B("#15306E") : B("#0D1A44"),
+                BorderBrush = style == "danger" ? Red : Line,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(12, 7, 12, 7),
+                MinWidth = 78,
+                MinHeight = 52,
+                Margin = new Thickness(3, 0, 3, 0)
+            };
+            if (style == "primary") b.Classes.Add("primary");
+            b.Click += (_, _) => go();
+            _texts.Add((key, () => { b.Content = Ico.Btn(icon, L.Get(key), style == "primary" ? Gold : TextMain, 22, 12); }));
+            return b;
+        }
+
+        _cmdBar.Children.Add(Big("filePlus", "addFiles", () => PickFiles()));
+        _cmdBar.Children.Add(Big("folderPlus", "addFolder", () => PickDirInto(_tbFrom)));
+        _cmdBar.Children.Add(Big("hdd", "destination", () => PickDirInto(_tbTo)));
+
+        var sep = new Border { Width = 1, Background = Line, Margin = new Thickness(6, 6, 6, 6) };
+        _cmdBar.Children.Add(sep);
+
+        _bCopy = Big("copy", "copy", () => _ = StartCopy(false), "primary");
+        _bMove = Big("move", "move", () => _ = StartCopy(true), "primary");
+        _bPause = Big("pause", "pause", Pause);
+        _bResume = Big("play", "resume", Resume);
+        _bCancel = Big("stop", "cancel", () => _engine?.Cancel(), "danger");
+        _bClear = Big("trash", "clear", Clear);
+
+        _cmdBar.SizeChanged += (_, e) =>
+        {
+            // En horizontal de telefono o tablet estrecha cabe de sobra; en vertical
+            // de 360 dp hay que achicar el ancho minimo o no entran los seis.
+            var tight = e.NewSize.Width > 0 && e.NewSize.Width < 430;
+            foreach (var b in _cmdBar.Children.OfType<Button>())
+            { b.MinWidth = tight ? 56 : 78; b.Padding = new Thickness(tight ? 6 : 12, 6, tight ? 6 : 12, 6); }
+        };
+        return box;
     }
 
     private Control BuildToolbar()
@@ -777,21 +1003,28 @@ public sealed partial class MainWindow : UserControl
             ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Auto) },
             Margin = new Thickness(8, 4)
         };
+        var icon = Ico.Get("swap", 22, Gold);
+        icon.VerticalAlignment = VerticalAlignment.Center;
+        icon.Margin = new Thickness(2, 0, 7, 0);
+        var brandBox = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0, VerticalAlignment = VerticalAlignment.Center };
+        brandBox.Children.Add(icon);
         var brand = new TextBlock
         {
-            Text = "QBasCopier y Transfer", FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold,
-            VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 8, 0),
+            Text = AppFullName, FontSize = 18, FontWeight = FontWeight.Bold, Foreground = Gold,
+            VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis, ClipToBounds = true
         };
-        Grid.SetColumn(brand, 0);
-        bar.Children.Add(brand);
+        brandBox.Children.Add(brand);
+        Grid.SetColumn(brandBox, 0);
+        bar.Children.Add(brandBox);
 
         _cmbLangQuick = new ComboBox
         {
-            ItemsSource = Ex.LangNames(), SelectedIndex = Ex.IndexOf(S.Lang),
-            MinWidth = 70, MaxWidth = 170, Width = 170,
+            ItemsSource = Ex.LangCodes(), SelectedIndex = Ex.IndexOf(S.Lang),
+            MinWidth = 62, MaxWidth = 92, Width = 92,
             HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 10, 0)
+            Margin = new Thickness(0, 0, 10, 0),
+            FontWeight = FontWeight.SemiBold
         };
         _cmbLangQuick.SelectionChanged += (s, e) => { if (Ex.Codes.Length > (s as ComboBox)?.SelectedIndex) ApplyLang(Ex.Codes[((ComboBox)s!).SelectedIndex]); };
         Grid.SetColumn(_cmbLangQuick, 1);
@@ -811,34 +1044,53 @@ public sealed partial class MainWindow : UserControl
         Grid.SetColumn(bQuit, 4);
         bar.Children.Add(bQuit);
 
-        // En pantallas estrechas el desplegable de idioma se encoge en vez de empujar
-        // los botones fuera de la vista.
+        // Plegar e integrar con el Explorador solo existen en Windows: en Android
+        // no hay ventana que plegar ni registro que tocar, asi que ocupan sitio de nada.
+        if (OperatingSystem.IsAndroid())
+        {
+            _bFold.IsVisible = false;
+            _bIntegrate.IsVisible = false;
+        }
+        else
+        {
+            _bIntegrate.Content = Ico.Btn("plug", Ex.Get("integrate"), TextMain, 18, 12);
+            _bFold.Content = Ico.Btn("fold", Ex.Get("fold"), TextMain, 18, 12);
+            bQuit.Content = Ico.Btn("exit", L.Get("quit"), Gold, 18, 12);
+        }
+
+        // Escalado por ancho para telefonos, tablets y pantallas grandes: la barra
+        // crezca con el dispositivo en vez de quedar diminuta en una tablet.
         bar.SizeChanged += (_, e) =>
         {
             var w = e.NewSize.Width;
             if (w <= 0) return;
             var tight = w < 620;
-            _cmbLangQuick.Width = tight ? 92 : 170;
-            _cmbLangQuick.FontSize = tight ? 12 : 13;
-            brand.TextTrimming = tight ? TextTrimming.CharacterEllipsis : TextTrimming.None;
+            var roomy = w >= 1000;
+            brand.FontSize = roomy ? 22 : tight ? 15.5 : 18;
+            icon.IconSizeSet(roomy ? 26 : tight ? 19 : 22);
+            _cmbLangQuick.Width = roomy ? 100 : 92;
+            _cmbLangQuick.FontSize = roomy ? 14 : 13;
         };
-
         return bar;
     }
 
     private Control BuildBody()
     {
         var body = new Grid { RowDefinitions = { new(GridLength.Star) }, Margin = new Thickness(4, 2, 4, 2) };
+
+        // Marca de agua: va debajo de las pestanas, no encima. Con opacidad bajísima
+        // se ve como textura y no tapa nada.
+        var wm = BuildWatermark();
+        Grid.SetRow(wm, 0);
+        body.Children.Add(wm);
+
         _tabs = new TabControl();
-        // A 360 dp seis cabeceras completas no caben y la ultima (Transferir) quedaba
-        // fuera de pantalla sin forma de alcanzarla.
         _tabs.Classes.Add("tabsCompact");
-        _tabs.Items.Add(MkTab(TabExplorer, BuildExplorerTab()));
-        _tabs.Items.Add(MkTab(TabQueue, BuildQueueBody()));
-        _tabs.Items.Add(MkTab(TabErrors, MakeErrBody()));
-        _tabs.Items.Add(MkTab(TabOptions, new ScrollViewer { Content = BuildOptsGrid() }));
-        _tabs.Items.Add(MkTab(TabHistory, MakeHistBody()));
-        _tabs.Items.Add(MkTab(TabTransfer, BuildTransferBody()));
+        _tabs.Items.Add(MkTab(TabCopy, BuildCopyTab(), "copy", "tabCopy"));
+        _tabs.Items.Add(MkTab(TabTransfer, BuildTransferBody(), "transfer", "tabTransfer"));
+        _tabs.Items.Add(MkTab(TabOptions, BuildOptionsTab(), "sliders", "tabInterface"));
+        _tabs.Items.Add(MkTab(TabHistory, MakeHistBody(), "history", "tabHistory"));
+        _tabs.Items.Add(MkTab(TabAbout, BuildAboutTab(), "info", "tabAbout"));
         Grid.SetRow(_tabs, 0);
         body.Children.Add(_tabs);
 
@@ -861,53 +1113,92 @@ public sealed partial class MainWindow : UserControl
         return body;
     }
 
-    private Control BuildExplorerTab()
-    {
-        _left = new FilePane();
-        _right = new FilePane();
-        _left.FilesDropped += paths => AddWithDest(paths, _right.CurrentPath);
-        _right.FilesDropped += paths => AddWithDest(paths, _left.CurrentPath);
-
-        var mid = new StackPanel { Spacing = 6, VerticalAlignment = VerticalAlignment.Center, MinWidth = 56 };
-        mid.Children.Add(Mk("⇒", () => PaneCopy(false)));
-        mid.Children.Add(Mk("⇐", () => PaneCopy(true)));
-        mid.Children.Add(Mk("⇉", () => PaneMove(false)));
-        mid.Children.Add(Mk("⇇", () => PaneMove(true)));
-
-        var grid = new Grid
-        {
-            ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto), new(GridLength.Star) }
-        };
-        Grid.SetColumn(_left, 0);
-        grid.Children.Add(_left);
-        Grid.SetColumn(mid, 1);
-        grid.Children.Add(mid);
-        Grid.SetColumn(_right, 2);
-        grid.Children.Add(_right);
-        return grid;
-    }
-
-    private Control BuildQueueBody()
+    private Control BuildCopyTab()
     {
         var panel = new StackPanel { Spacing = 6 };
 
-        var fromRow = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto), new(GridLength.Auto) } };
+        // Origen: una sola lista, como en un copiador normal. Nada de dos paneles.
+        var fromRow = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
         _lblFrom = MkLbl("", 13);
         Grid.SetColumn(_lblFrom, 0); fromRow.Children.Add(_lblFrom);
-        _tbFrom = new TextBox { Margin = new Thickness(4, 0, 4, 0) };
+        _tbFrom = new TextBox { Margin = new Thickness(4, 0, 4, 0), MinHeight = 36 };
         Grid.SetColumn(_tbFrom, 1); fromRow.Children.Add(_tbFrom);
         var bFrom = Mk("…", () => PickDirInto(_tbFrom));
+        bFrom.MinWidth = 44; bFrom.MinHeight = 36;
         Grid.SetColumn(bFrom, 2); fromRow.Children.Add(bFrom);
-        var bAdd = Mk("+", () => PickFiles());
-        Grid.SetColumn(bAdd, 3); fromRow.Children.Add(bAdd);
 
         var toRow = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
         var lblTo = MkLbl("", 13);
         Grid.SetColumn(lblTo, 0); toRow.Children.Add(lblTo);
-        _tbTo = new TextBox { Margin = new Thickness(4, 0, 4, 0) };
+        _tbTo = new TextBox { Margin = new Thickness(4, 0, 4, 0), MinHeight = 36 };
         Grid.SetColumn(_tbTo, 1); toRow.Children.Add(_tbTo);
         var bTo = Mk("…", () => PickDirInto(_tbTo));
+        bTo.MinWidth = 44; bTo.MinHeight = 36;
         Grid.SetColumn(bTo, 2); toRow.Children.Add(bTo);
+
+        // Barra individual: aparece solo con un elemento seleccionado y actsua sobre
+        // ese elemento. Copiar y Mover en general son los de la barra de abajo.
+        _oneBar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
+        _oneLbl = MkLbl("", 12.5).Tint(TextSoft);
+        _oneLbl.MaxWidth = 260;
+        _oneLbl.TextTrimming = TextTrimming.CharacterEllipsis;
+        _oneBar.Children.Add(_oneLbl);
+        Button One(string ico, string key, Action go, string cls = "")
+        {
+            var b = new Button
+            {
+                Content = Ico.Btn(ico, L.Get(key), cls == "primary" ? Gold : TextMain, 18, 11.5),
+                Background = cls == "primary" ? B("#15306E") : B("#0D1A44"),
+                BorderBrush = Line, BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(9, 5, 9, 5), MinHeight = 40
+            };
+            if (cls == "primary") b.Classes.Add("primary");
+            b.Click += (_, _) => go();
+            _texts.Add((key, () => b.Content = Ico.Btn(ico, L.Get(key), cls == "primary" ? Gold : TextMain, 18, 11.5)));
+            return b;
+        }
+        _oneBar.Children.Add(One("copy", "oneCopy", () => RunOne(false), "primary"));
+        _oneBar.Children.Add(One("move", "oneMove", () => RunOne(true), "primary"));
+        _oneBar.Children.Add(One("rename", "rename", () => RenameSelected()));
+        _oneBar.Children.Add(One("trash", "delete", () => DeleteSelected()));
+
+        _oneBox = new Border
+        {
+            Background = B("#0C1B4A"),
+            BorderBrush = Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(8, 5, 8, 5),
+            IsVisible = false,
+            Child = _oneBar
+        };
+
+        // Herramientas de lista: lo que cualquier copiador trae y aqui faltaba.
+        var tools = new WrapPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        Button Tool(string ico, string key, Action go)
+        {
+            var b = new Button
+            {
+                Content = Ico.Get(ico, 17, TextSoft),
+                ToolTip = L.Get(key),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                CornerRadius = new CornerRadius(7),
+                MinWidth = 38,
+                MinHeight = 34,
+                Padding = new Thickness(6, 2, 6, 2)
+            };
+            b.Click += (_, _) => go();
+            _texts.Add((key, () => b.ToolTip = L.Get(key)));
+            return b;
+        }
+        tools.Children.Add(Tool("list", "selectAll", SelectAllQueue));
+        tools.Children.Add(Tool("x", "deselectAll", () => _lbQueue.SelectedItems.Clear()));
+        tools.Children.Add(Tool("minus", "removeFromList", RemoveSelected));
+        tools.Children.Add(Tool("trash", "delete", DeleteSelected));
+        tools.Children.Add(Tool("folder", "openFolder", OpenContaining));
+        tools.Children.Add(Tool("swap", "reverseList", () => { _queue.Reverse(); RefreshQueueUi(); }));
+        tools.Children.Add(Tool("refresh", "clear", Clear));
 
         _lbQueue = new ListBox { SelectionMode = SelectionMode.Multiple, MinHeight = 190 };
         DragDrop.SetAllowDrop(_lbQueue, true);
@@ -919,6 +1210,7 @@ public sealed partial class MainWindow : UserControl
             if (fl is { Length: > 0 }) AddFiles(fl);
         }));
         _lbQueue.ItemTemplate = new FuncDataTemplate<CopyItem>((it, _ns) => BuildQueueRow(it));
+        _lbQueue.SelectionChanged += (_, _) => UpdateOneBar();
 
         var gl = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Auto), new(GridLength.Star) } };
         _lblProg = MkLbl("0%", 13);
@@ -932,34 +1224,248 @@ public sealed partial class MainWindow : UserControl
         _ggBar = new ProgressBar { Minimum = 0, Maximum = 100, Height = 16 };
         _lblCur = MkLbl("", 13);
 
-        var btns = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 4, 0, 0) };
-        btns.Children.Add(_bCopy = Mk("copy", () => _ = StartCopy(false)));
-        _bCopy.Classes.Add("primary");
-        btns.Children.Add(_bMove = Mk("move", () => _ = StartCopy(true)));
-        btns.Children.Add(_bPause = Mk("pause", Pause));
-        btns.Children.Add(_bResume = Mk("resume", Resume));
-        btns.Children.Add(_bSkip = Mk("skip", SkipRest));
-        btns.Children.Add(_bCancel = Mk("cancel", () => _engine?.Cancel()));
-        btns.Children.Add(_bClear = Mk("clear", Clear));
+        // Tira de errores: solo se ve cuando hay algo que contar, para no dejar un
+        // hueco vacio en la pantalla del movil.
+        _lbErrs = new ListBox { MinHeight = 90, MaxHeight = 150 };
+        _lbErrs.ItemTemplate = new FuncDataTemplate<string>((s2, _ns) => new TextBlock { Text = s2, TextWrapping = TextWrapping.Wrap, Foreground = B("#F0A9B2"), FontSize = 12 });
+        var errBox = new Border
+        {
+            Background = B("#2A0A14"),
+            BorderBrush = Red,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 6),
+            IsVisible = false,
+            Child = new StackPanel
+            {
+                Spacing = 4,
+                Children =
+                {
+                    new TextBlock { Text = "!", Foreground = Red, FontSize = 12, FontWeight = FontWeight.Bold },
+                    _lbErrs
+                }
+            }
+        };
+        _errBox = errBox;
+
+        // Omitir el resto no cabe en la barra de comandos, que ya esta llena: se
+        // queda en la propia lista y solo se usa durante una copia.
+        _bSkip = Mk("skip", SkipRest);
+        _bSkip.IsVisible = false;
+        _bSkip.Width = 0;
+        _bSkip.MinWidth = 0;
+        _bSkip.Padding = new Thickness(0);
+        _bSkip.Margin = new Thickness(0);
 
         panel.Children.Add(fromRow);
         panel.Children.Add(toRow);
+        panel.Children.Add(_oneBox);
         panel.Children.Add(_lbQueue);
         panel.Children.Add(gl);
         panel.Children.Add(_ggBar);
         panel.Children.Add(_lblCur);
-        panel.Children.Add(btns);
+        panel.Children.Add(errBox);
+        panel.Children.Add(_bSkip);
 
         Bind(_lblFrom, "histFrom");
         Bind(lblTo, "histTo");
-        Bind(_bCopy, "copy");
-        Bind(_bMove, "move");
-        Bind(_bPause, "pause");
-        Bind(_bResume, "resume");
-        Bind(_bSkip, "skip");
-        Bind(_bCancel, "cancel");
-        Bind(_bClear, "clear");
         return panel;
+    }
+
+    private Border? _errBox;
+
+    private void UpdateOneBar()
+    {
+        if (_oneBox == null || _lbQueue == null) return;
+        var sel = _lbQueue.SelectedItems.Cast<CopyItem>().ToArray();
+        _oneBox.IsVisible = sel.Length == 1 && !_running;
+        if (sel.Length != 1) return;
+        _oneLbl.Text = sel[0].Name;
+    }
+
+    /// <summary>Copiar o mover solo el elemento marcado, sin tocar el resto de la lista.</summary>
+    private void RunOne(bool move)
+    {
+        if (_lbQueue.SelectedItems.Cast<CopyItem>().FirstOrDefault() is not { } it) return;
+        var rest = _queue.Where(x => !ReferenceEquals(x, it)).ToList();
+        _queue.Clear();
+        _queue.Add(it);
+        _engine = null;
+        _oneShot = rest;
+        _ = StartCopy(move);
+    }
+
+    private List<CopyItem>? _oneShot;
+
+    private void SelectAllQueue()
+    {
+        if (_lbQueue == null) return;
+        _lbQueue.SelectAll();
+    }
+
+    // ------------------------------------------------- acciones sobre la lista
+    private List<CopyItem> Selected() => _lbQueue == null ? new() : _lbQueue.SelectedItems.Cast<CopyItem>().ToList();
+
+    /// <summary>Quita los elementos marcados de la lista. No toca el disco.</summary>
+    private void RemoveSelected()
+    {
+        var sel = Selected();
+        if (sel.Count == 0) return;
+        foreach (var it in sel) _queue.Remove(it);
+        RefreshQueueUi();
+        UpdateOneBar();
+    }
+
+    /// <summary>Borra de verdad los elementos marcados, previa confirmacion.</summary>
+    private async void DeleteSelected()
+    {
+        if (_running) return;
+        var sel = Selected();
+        if (sel.Count == 0) return;
+        var ok = await ConfirmAsync(L.Get("delete"), $"{sel.Count}", "danger");
+        if (!ok) return;
+        int n = 0;
+        foreach (var it in sel)
+        {
+            try
+            {
+                if (it.IsDirectory) Directory.Delete(it.SourcePath, true);
+                else File.Delete(it.SourcePath);
+                n++;
+            }
+            catch (Exception e) { _errLines.Add($"✗ {it.Name}: {e.Message}"); }
+        }
+        foreach (var it in sel) _queue.Remove(it);
+        ShowErrBox();
+        RefreshQueueUi();
+        UpdateOneBar();
+        _lblStatus.Text = $"{n}/{sel.Count}";
+    }
+
+    /// <summary>Renombra el elemento marcado: primero en la lista, luego en el disco.</summary>
+    private async void RenameSelected()
+    {
+        if (_running) return;
+        var sel = Selected();
+        if (sel.Count != 1) return;
+        var it = sel[0];
+        var newName = await PromptAsync(L.Get("rename"), it.Name);
+        if (string.IsNullOrWhiteSpace(newName) || newName == it.Name) return;
+        if (newName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            await ConfirmAsync(L.Get("warning"), L.Get("errValue"));
+            return;
+        }
+        try
+        {
+            var dir = Path.GetDirectoryName(it.SourcePath);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir) && (File.Exists(it.SourcePath) || Directory.Exists(it.SourcePath)))
+            {
+                var target = Path.Combine(dir, newName);
+                if (it.IsDirectory) Directory.Move(it.SourcePath, target);
+                else File.Move(it.SourcePath, target);
+                it.SourcePath = target;
+                it.DestPath = "";
+                it.RaiseAll();
+            }
+        }
+        catch (Exception e) { _errLines.Add($"✗ {it.Name}: {e.Message}"); ShowErrBox(); }
+        RefreshQueueUi();
+        UpdateOneBar();
+    }
+
+    /// <summary>Abre la carpeta que contiene el elemento marcado.</summary>
+    private void OpenContaining()
+    {
+        var it = Selected().FirstOrDefault();
+        var path = it?.SourcePath;
+        if (string.IsNullOrEmpty(path)) return;
+        try
+        {
+            var dir = Directory.Exists(path) ? path : Path.GetDirectoryName(path);
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+            Plat.OpenFolder(dir);
+        }
+        catch { }
+    }
+
+    // ------------------------------------------------------------- pregunta si/no
+    private async Task<bool> ConfirmAsync(string title, string message, string style = "")
+    {
+        var res = await AskAsync<bool>(title, 460, 220, done =>
+        {
+            var sp = new StackPanel { Spacing = 10 };
+            sp.Children.Add(MkLbl(title, 16));
+            sp.Children.Add(MkLbl(message, 13).Tint(TextSoft));
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
+            var no = Mk("cancel", () => done(false));
+            var yes = Mk("ok", () => done(true));
+            if (style == "danger") yes.Classes.Add("danger");
+            else yes.Classes.Add("primary");
+            row.Children.Add(no); row.Children.Add(yes);
+            sp.Children.Add(row);
+            return sp;
+        });
+        return res;
+    }
+
+    private async Task<string?> PromptAsync(string title, string initial)
+    {
+        return await AskAsync<string>(title, 520, 220, done =>
+        {
+            var sp = new StackPanel { Spacing = 10 };
+            sp.Children.Add(MkLbl(title, 16));
+            var tb = new TextBox { Text = initial, MinHeight = 36 };
+            sp.Children.Add(tb);
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 8, 0, 0) };
+            row.Children.Add(Mk("cancel", () => done(null)));
+            var okb = Mk("ok", () => done(tb.Text ?? ""));
+            okb.Classes.Add("primary");
+            row.Children.Add(okb);
+            sp.Children.Add(row);
+            return sp;
+        });
+    }
+
+    // --------------------------------------------------------- capa emergente
+    private Control? _sheet;
+
+    /// <summary>
+    /// Capa emergente para menus y avisos. Es la misma tecnica que usa AskAsync pero
+    /// sin esperar resultado, para abrir un menu y cerrarlo al pulsar un item.
+    /// </summary>
+    private void OpenSheet(Control content)
+    {
+        CloseSheet();
+        var root = this.FindControl<Grid>("Root");
+        if (root == null) return;
+        var layer = new Grid { Background = new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)) };
+        var card = new Border
+        {
+            Background = BgDeep,
+            BorderBrush = Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(8),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        card.Child = content;
+        layer.Children.Add(card);
+        root.Children.Add(layer);
+        // Pulsar fuera del menu lo cierra, como en cualquier hoja emergente.
+        layer.PointerPressed += (_, _) => CloseSheet();
+        card.PointerPressed += (_, e) => e.Handled = true;
+        _sheet = layer;
+    }
+
+    private void CloseSheet()
+    {
+        var root = this.FindControl<Grid>("Root");
+        if (root != null && _sheet != null) root.Children.Remove(_sheet);
+        _sheet = null;
+    }
+        _lbQueue.SelectAll();
     }
 
     private static Control BuildQueueRow(CopyItem it)
@@ -981,19 +1487,6 @@ public sealed partial class MainWindow : UserControl
         dst.Bind(TextBlock.TextProperty, new Binding("DestName"));
         Grid.SetColumn(dst, 4); grid.Children.Add(dst);
         return grid;
-    }
-
-    private Control MakeErrBody()
-    {
-        var panel = new StackPanel { Spacing = 6 };
-        _lbErrs = new ListBox { MinHeight = 240 };
-        _lbErrs.ItemTemplate = new FuncDataTemplate<string>((s, _ns) => new TextBlock { Text = s, TextWrapping = TextWrapping.Wrap, Foreground = TextSoft });
-        panel.Children.Add(_lbErrs);
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var bClr = Mk("clear", () => { _errLines.Clear(); _lbErrs.ItemsSource = null; });
-        row.Children.Add(bClr);
-        panel.Children.Add(row);
-        return panel;
     }
 
     private Control BuildOptsGrid()
@@ -1080,65 +1573,8 @@ public sealed partial class MainWindow : UserControl
         _cmbError = new ComboBox { ItemsSource = errNames, SelectedIndex = Math.Max(0, Array.IndexOf(errCodes, S.ErrorDefault)) };
         _cmbError.SelectionChanged += (s, e) => { S.ErrorDefault = errCodes[Math.Clamp(_cmbError.SelectedIndex, 0, errCodes.Length - 1)]; S.Save(); };
 
-        void Add(string key, Control c)
-        {
-            var lb = MkLbl(L.Get(key), 13);
-            var row = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) }, Margin = new Thickness(0, 2, 0, 2) };
-            Grid.SetColumn(lb, 0);
-            Grid.SetColumn(c, 1);
-            row.Children.Add(lb);
-            row.Children.Add(c);
-            col.Children.Add(row);
-            _texts.Add((key, () => { try { lb.Text = L.Get(key); } catch { } }));
-        }
-
-        void Sec(string key)
-        {
-            var t = MkLbl(L.Get(key), 13);
-            t.FontWeight = FontWeight.Bold;
-            t.Foreground = Gold;
-            col.Children.Add(t);
-            _texts.Add((key, () => { try { t.Text = L.Get(key); } catch { } }));
-        }
-
-        void AddEx(string key, Control c)
-        {
-            var lb = MkLbl(Ex.Get(key), 13);
-            var row = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) }, Margin = new Thickness(0, 2, 0, 2) };
-            Grid.SetColumn(lb, 0);
-            Grid.SetColumn(c, 1);
-            row.Children.Add(lb);
-            row.Children.Add(c);
-            col.Children.Add(row);
-            _texts.Add((key, () => { try { lb.Text = Ex.Get(key); } catch { } }));
-        }
-
-        void AddChk(CheckBox cb, string key)
-        {
-            col.Children.Add(cb);
-            _texts.Add((key, () => { try { cb.Content = Ex.Get(key); } catch { } }));
-        }
-
-        Add("sLanguage", _cmbLang);
-        Add("units", _cmbSizeUnit);
-        Sec("afterDone"); col.Children.Add(_cmbAfter);
-        Sec("speedLimit"); col.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _chkLimit, _sldSpeed, _tbSpeed, _lblSpeed } });
-        Sec("collisionDefault"); col.Children.Add(_cmbCollision);
-        Sec("errorDefault"); col.Children.Add(_cmbError); Add("retryInterval", _tbRetry);
-        Sec("addListsWhen"); col.Children.Add(_cmbAddWhen); AddChk(_chkAskAdd, "confirmAdd");
-        Sec("rename"); col.Children.Add(_tbNewPat);
-        Sec("sAdvanced");
-        Add("engineType", _cmbEngine);
-        Add("threads", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _sldThreads, _lblThreads } });
-        Add("buffer", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _cmbBuffer, _tbBuffer } });
-        Add("interval", _tbUpdate);
-        Add("speedAvg", _tbAvg);
-        Add("throttle", _tbThrottle);
-        Add("priority", _cmbPriority);
-        AddEx("diskWarn", _tbWarn);
-        AddChk(_chkVerify, "verify");
-
-        var checks = new StackPanel { Spacing = 4 };
+        // Controles de la zona de arranque y comportamiento, que antes vivian en la
+        // segunda columna del grid y ahora van dentro de su grupo.
         var chkTray = MkChk("", S.TrayIcon, b => { S.TrayIcon = b; S.Save(); BuildTray(); });
         var chkStart = MkChk("", S.StartWithWindows, b => { S.StartWithWindows = b; S.Save(); if (!OperatingSystem.IsAndroid()) ApplyStartWithWindows(b); });
         var chkAttrib = MkChk("", S.CopyAttributes, b => { S.CopyAttributes = b; S.Save(); });
@@ -1148,74 +1584,216 @@ public sealed partial class MainWindow : UserControl
         var chkRO = MkChk("", S.OverwriteReadOnly, b => { S.OverwriteReadOnly = b; S.Save(); });
         var chkHidden = MkChk("", S.SkipHiddenSystem, b => { S.SkipHiddenSystem = b; S.Save(); });
         var chkTitle = MkChk("", S.ShowInTitle, b => { S.ShowInTitle = b; S.Save(); });
-        void SecC(string key)
-        {
-            var t = MkLbl(L.Get(key), 13);
-            t.FontWeight = FontWeight.Bold;
-            t.Foreground = Gold;
-            checks.Children.Add(t);
-            _texts.Add((key, () => { try { t.Text = L.Get(key); } catch { } }));
-        }
-        void BindEx(CheckBox cb, string key)
-        {
-            checks.Children.Add(cb);
-            _texts.Add((key, () => { try { cb.Content = Ex.Get(key); } catch { } }));
-        }
-        SecC("sStartup");
-        Bind(chkStart, "startWithWindows");
-        BindEx(_chkActivate, "activateOnStart");
-        SecC("sUI");
-        Bind(chkTray, "minToTray");
-        Bind(chkTitle, "showInTitle");
-        SecC("copyAttribs");
-        Bind(chkAttrib, "copyAttribs");
-        Bind(chkSec, "copySecurity");
-        Bind(chkRO, "overwriteRO");
-        Bind(chkHidden, "skipHidden");
-        SecC("delUnfinished");
-        Bind(chkDel, "delUnfinished");
-        Bind(chkKeep, "keepOnError");
-        SecC("sLog");
-        BindEx(_chkLog, "autoSaveLog");
-        Bind(_chkLimit, "enabled");
 
-        var bottom = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 10, 0, 0) };
         var bSave = Mk("apply", () => { S.Save(); _lblStatus.Text = L.Get("ok"); });
         var bDef = Mk("sDefaults", () => { S = Settings.Load(); S.Save(); ReloadTexts(); });
-        bottom.Children.Add(bSave);
-        bottom.Children.Add(bDef);
+        var bHistOpen = Mk("histOpen", () =>
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(HistoryStore.PathFile);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir)) Plat.OpenFolder(dir);
+            }
+            catch { }
+        });
 
-        col.Children.Add(bottom);
+        // Fila etiqueta + control, con el texto pegado al control para que se lea
+        // rapido sin tener que saltar la mirada de un sitio a otro.
+        Control Row(string key, Control c) => LRow(() => L.Get(key), key, c);
+        Control RowEx(string key, Control c) => LRow(() => Ex.Get(key), key, c);
+        Control LRow(Func<string> get, string key, Control c)
+        {
+            var lb = MkLbl(get(), 13);
+            lb.VerticalAlignment = VerticalAlignment.Center;
+            lb.MinWidth = 132;
+            var sp = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(0, 3, 0, 3) };
+            sp.Children.Add(lb);
+            sp.Children.Add(c);
+            _texts.Add((key, () => { try { lb.Text = get(); } catch { } }));
+            return sp;
+        }
+        Control Chk(CheckBox cb, string key)
+        {
+            _texts.Add((key, () => { try { cb.Content = L.Get(key); } catch { } }));
+            return cb;
+        }
+        Control ExChk(CheckBox cb, string key)
+        {
+            _texts.Add((key, () => { try { cb.Content = Ex.Get(key); } catch { } }));
+            return cb;
+        }
 
-        var about = new StackPanel { Spacing = 6, Margin = new Thickness(0, 16, 0, 0) };
-        var aboutT = MkLbl("Acerca de QBasCopier y Transfer", 13);
-        aboutT.FontWeight = FontWeight.Bold;
-        aboutT.Foreground = Gold;
-        about.Children.Add(aboutT);
+        // ---- Presentacion por grupos, al estilo de los ajustadores buenos: cada
+        // ---- bloque con su icono y su titulo, y todo dentro de un ScrollViewer
+        // ---- para que en un movil se pueda bajar con el dedo sin perderse.
+        StackPanel Gen = null!, Rend = null!, Comp = null!, Int = null!, Idio = null!, Expl = null!, Log = null!;
+
+        Control Group(string icon, string titleKey, out StackPanel body)
+        {
+            var card = new Border
+            {
+                Background = B("#0A1740"),
+                BorderBrush = Line,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(12, 10, 12, 12),
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 8) };
+            head.Children.Add(Ico.Get(icon, 18, Gold));
+            var ht = MkLbl(L.Get(titleKey), 14);
+            ht.FontWeight = FontWeight.Bold;
+            ht.Foreground = Gold;
+            ht.VerticalAlignment = VerticalAlignment.Center;
+            head.Children.Add(ht);
+            _texts.Add((titleKey, () => { try { ht.Text = L.Get(titleKey); } catch { } }));
+            body = new StackPanel { Spacing = 4 };
+            var inner = new StackPanel { Spacing = 4, Children = { head, body } };
+            card.Child = inner;
+            return card;
+        }
+
+        var g1 = Group("sliders", "sSpeed", out Gen);
+        var g2 = Group("cpu", "sPerformance", out Rend);
+        var g3 = Group("list", "tabCopyList", out Comp);
+        var g4 = Group("lang", "sLanguage", out Idio);
+        var g5 = Group("plug", "sExplorer", out Expl);
+        var g6 = Group("file", "sLog", out Log);
+
+        Gen.Children.Add(Row("sLanguage", _cmbLang));
+        Gen.Children.Add(Row("units", _cmbSizeUnit));
+        Gen.Children.Add(Row("afterDone", _cmbAfter));
+        Gen.Children.Add(new TextBlock { Height = 4 });
+        Gen.Children.Add(Row("speedLimit", new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Children = { _chkLimit, _sldSpeed, _tbSpeed, _lblSpeed }
+        }));
+
+        Rend.Children.Add(Row("engineType", _cmbEngine));
+        Rend.Children.Add(Row("threads", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _sldThreads, _lblThreads } }));
+        Rend.Children.Add(Row("buffer", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _cmbBuffer, _tbBuffer } }));
+        Rend.Children.Add(Row("priority", _cmbPriority));
+        Rend.Children.Add(Row("throttle", _tbThrottle));
+
+        Comp.Children.Add(Row("collisionDefault", _cmbCollision));
+        Comp.Children.Add(Row("errorDefault", _cmbError));
+        Comp.Children.Add(Row("retryInterval", _tbRetry));
+        Comp.Children.Add(Row("addListsWhen", _cmbAddWhen));
+        Comp.Children.Add(ExChk(_chkAskAdd, "confirmAdd"));
+        Comp.Children.Add(Row("rename", _tbNewPat));
+        Comp.Children.Add(Row("interval", _tbUpdate));
+        Comp.Children.Add(Row("speedAvg", _tbAvg));
+
+        Expl.Children.Add(Chk(chkStart, "startWithWindows"));
+        Expl.Children.Add(ExChk(_chkActivate, "activateOnStart"));
+        Expl.Children.Add(Chk(chkTray, "minToTray"));
+        Expl.Children.Add(Chk(chkTitle, "showInTitle"));
+
+        Idio.Children.Add(ExChk(_chkVerify, "verify"));
+        Idio.Children.Add(RowEx("diskWarn", _tbWarn));
+        Idio.Children.Add(Chk(chkAttrib, "copyAttribs"));
+        Idio.Children.Add(Chk(chkSec, "copySecurity"));
+        Idio.Children.Add(Chk(chkRO, "overwriteRO"));
+        Idio.Children.Add(Chk(chkHidden, "skipHidden"));
+        Idio.Children.Add(Chk(chkDel, "delUnfinished"));
+        Idio.Children.Add(Chk(chkKeep, "keepOnError"));
+
+        Log.Children.Add(ExChk(_chkLog, "autoSaveLog"));
+        Log.Children.Add(Row("histOpen", bHistOpen));
+        Log.Children.Add(bSave);
+        Log.Children.Add(bDef);
+
+        var cols = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 460 };
+        void Put(Control c)
+        {
+            var host = new StackPanel { Width = 460, Margin = new Thickness(0, 0, 14, 0) };
+            host.Children.Add(c);
+            cols.Children.Add(host);
+        }
+        Put(g1); Put(g2); Put(g3);
+        Put(g4); Put(g5); Put(g6);
+
+        var page = new StackPanel { Spacing = 4, Margin = new Thickness(12, 8, 12, 8), Children = { cols } };
+        return page;
+    }
+
+    /// <summary>Las opciones en una tarjeta con scroll: en movil cabe y se recorre bien.</summary>
+    private Control BuildOptionsTab() => new ScrollViewer
+    {
+        Content = BuildOptsGrid(),
+        HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+        VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+    };
+
+    /// <summary>
+    /// Acerca de: la historia completa y el credito de Freeman y Disenos, con el
+    /// logo. Es la unica parte de la app que no es funcional, y por eso va aparte.
+    /// </summary>
+    private Control BuildAboutTab()
+    {
+        var page = new StackPanel { Spacing = 12, Margin = new Thickness(16, 12, 16, 12) };
+
+        var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
         try
         {
             using var s = AssetLoader.Open(new Uri("avares://QBasCopier/Assets/logo.png"));
-            about.Children.Add(new Image { Source = new Bitmap(s), Width = 96, Height = 96, Stretch = Stretch.Uniform, Margin = new Thickness(0, 2, 0, 0) });
+            head.Children.Add(new Image
+            {
+                Source = new Bitmap(s), Width = 88, Height = 88,
+                Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Top
+            });
         }
         catch { }
-        var aboutBody = MkLbl(AboutText, 12);
-        aboutBody.TextWrapping = TextWrapping.Wrap;
-        aboutBody.MaxWidth = 460;
-        aboutBody.Tint(TextSoft);
-        about.Children.Add(aboutBody);
-        col.Children.Add(about);
+        var ht = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+        ht.Children.Add(new TextBlock { Text = AppFullName, FontSize = 24, FontWeight = FontWeight.Bold, Foreground = Gold });
+        var verLbl = MkLbl("", 12);
+        ht.Children.Add(verLbl);
+        ht.Children.Add(MkLbl(AppFullName + "  ·  " + L.Get("madeBy"), 13).Tint(TextSoft));
+        _texts.Add(("version", () => verLbl.Text = $"{L.Get("version")} {AppVersion}"));
+        _texts.Add(("madeBy", () => { }));
+        head.Children.Add(ht);
+        page.Children.Add(head);
 
-        var foot = new StackPanel { Spacing = 3, Margin = new Thickness(0, 14, 0, 0) };
-        foot.Children.Add(MkLbl("Creado por QBaswing Designer · 2026", 11).Tint(TextSoft));
-        foot.Children.Add(MkLbl("Asociado a Freeman y Diseños", 11).Tint(TextSoft));
-        foot.Children.Add(MkLbl("Todos los derechos reservados © 2026", 11).Tint(TextSoft));
-        col.Children.Add(foot);
+        var body = new TextBlock { Text = AboutText, FontSize = 13, TextWrapping = TextWrapping.Wrap, Foreground = TextMain, LineHeight = 21 };
+        page.Children.Add(body);
 
-        Grid.SetColumn(col, 0);
-        g.Children.Add(col);
-        Grid.SetColumn(checks, 1);
-        g.Children.Add(checks);
-        return g;
+        // Freeman y Disenos con su propio bloque: es un credito, no una marca conjunta.
+        var fr = new Border
+        {
+            Background = B("#0A1740"),
+            BorderBrush = B("#C9A45C"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(14, 12, 14, 12)
+        };
+        var frSp = new StackPanel { Spacing = 6 };
+        var frHead = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        frHead.Children.Add(Ico.Get("star", 20, Gold));
+        frHead.Children.Add(new TextBlock { Text = "Freeman y Diseños", FontSize = 15, FontWeight = FontWeight.Bold, Foreground = Gold, VerticalAlignment = VerticalAlignment.Center });
+        frSp.Children.Add(frHead);
+        frSp.Children.Add(new TextBlock
+        {
+            Text = "Una parte muy especial de esta obra pertenece a Frank Freeman, de Freeman y Diseños —"
+                 + "también conocido como Freeman Impresiones—, que cree en este proyecto y lo sostiene "
+                 + "en cada paso. Gracias.",
+            FontSize = 13, TextWrapping = TextWrapping.Wrap, Foreground = TextSoft, LineHeight = 20
+        });
+        fr.Child = frSp;
+        page.Children.Add(fr);
+
+        var foot = new StackPanel { Spacing = 3, Margin = new Thickness(0, 4, 0, 0) };
+        foot.Children.Add(MkLbl(L.Get("engineInfo"), 12).Tint(TextSoft));
+        foot.Children.Add(MkLbl(L.Get("madeBy"), 12).Tint(TextSoft));
+        foot.Children.Add(MkLbl(L.Get("rights") + " © 2026", 12).Tint(TextSoft));
+        page.Children.Add(foot);
+
+        return new ScrollViewer
+        {
+            Content = page,
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+        };
     }
 
     private Control MakeHistBody()
@@ -1255,19 +1833,147 @@ public sealed partial class MainWindow : UserControl
 
     private Control BuildStatusbar()
     {
-        var bar = new Grid { ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) }, Margin = new Thickness(8, 0, 8, 3) };
-        _lblStatus = MkLbl("QBasCopier y Transfer 1.2.0", 12);
-        Grid.SetColumn(_lblStatus, 0);
+        // Pie: a la izquierda el credito de marca y a la derecha el estado, igual que
+        // el bloque .brand-credit de QBasWing MyServer. Va en una fila sola, con la
+        // marca en dos lineas pequenas y translucidas, para que se vea sin estafar.
+        var bar = new Grid
+        {
+            ColumnDefinitions = { new(GridLength.Star), new(GridLength.Auto) },
+            Margin = new Thickness(0, 0, 0, 0)
+        };
+        bar.Children.Add(BuildBrandCredit());
+        _lblStatus = MkLbl(AppFullName + " " + AppVersion, 12);
+        _lblStatus.Foreground = B("#5A6A8C");
+        _lblStatus.HorizontalAlignment = HorizontalAlignment.Right;
+        _lblStatus.VerticalAlignment = VerticalAlignment.Center;
+        _lblStatus.Margin = new Thickness(0, 0, 12, 0);
+        _lblStatus.TextTrimming = TextTrimming.CharacterEllipsis;
+        _lblStatus.MaxWidth = 220;
+        Grid.SetColumn(_lblStatus, 1);
         bar.Children.Add(_lblStatus);
-        var ver = MkLbl("© 2026", 12);
-        ver.HorizontalAlignment = HorizontalAlignment.Right;
-        Grid.SetColumn(ver, 1);
-        bar.Children.Add(ver);
+
+        bar.SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width > 0 && e.NewSize.Width < 420;
+            _lblStatus.FontSize = narrow ? 10.5 : 12;
+            _lblStatus.Margin = new Thickness(0, 0, narrow ? 8 : 12, 0);
+            _lblStatus.MaxWidth = narrow ? 110 : 220;
+        };
         return bar;
     }
 
+    /// <summary>
+    /// Credito de marca, el mismo diseno que QBasWing MyServer: fijo, abajo a la
+    /// izquierda, dos lineas, la primera en dorado apagado y la segunda en gris
+    /// tenue, con una opacidad baja para que se lea sin robarle sitio a la interfaz.
+    /// No captura toques para no estorbar la barra de comandos.
+    /// </summary>
+    private Control BuildBrandCredit()
+    {
+        var l1 = new TextBlock
+        {
+            Text = (AppFullName + "  ·  ASOCIADO CON FREEMAN Y DISEÑOS").ToUpperInvariant(),
+            Foreground = B("#C9A45C"),
+            Opacity = 0.85,
+            FontSize = 10.5,
+            LetterSpacing = 0.4
+        };
+        var l2 = new TextBlock
+        {
+            Text = L.Get("rights") + " © 2026",
+            Foreground = B("#67738C"),
+            Opacity = 0.85,
+            FontSize = 10.5
+        };
+        _texts.Add(("rights", () => l2.Text = L.Get("rights") + " © 2026"));
+
+        var box = new StackPanel
+        {
+            Spacing = 0,
+            Margin = new Thickness(14, 2, 0, 4),
+            IsHitTestVisible = false,
+            Children = { l1, l2 }
+        };
+        box.SizeChanged += (_, e) =>
+        {
+            var narrow = e.NewSize.Width > 0 && e.NewSize.Width < 420;
+            l1.FontSize = narrow ? 9 : 10.5;
+            l2.FontSize = narrow ? 9 : 10.5;
+            box.Margin = new Thickness(narrow ? 10 : 14, 2, 0, narrow ? 3 : 4);
+        };
+        return box;
+    }
+
+    /// <summary>
+    /// Marca de agua de fondo. Antes era un texto de 120 px opaco en el centro y se
+    /// comia media pantalla; ahora es una textura casi invisible que se nota al
+    /// mover el raton pero no estorba para leer.
+    /// </summary>
+    private Control BuildWatermark()
+    {
+        var t1 = new TextBlock
+        {
+            Text = AppFullName.ToUpperInvariant(),
+            Foreground = Gold,
+            Opacity = 0.05,
+            FontWeight = FontWeight.Bold,
+            LetterSpacing = 6,
+            HorizontalAlignment = TextAlignment.Center
+        };
+        var t2 = new TextBlock
+        {
+            Text = "Asociado con Freeman y Diseños",
+            Foreground = Gold,
+            Opacity = 0.07,
+            FontSize = 14,
+            LetterSpacing = 3,
+            HorizontalAlignment = TextAlignment.Center
+        };
+        var sp = new StackPanel
+        {
+            Spacing = 6,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false,
+            Children = { t1, t2 }
+        };
+        sp.SizeChanged += (_, e) =>
+        {
+            var w = e.NewSize.Width;
+            if (w <= 0) return;
+            // Escalado por tamano: 120 px en un movil de 360 dp se comia la pantalla.
+            t1.FontSize = Math.Clamp(w * 0.085, 22, 96);
+            t2.FontSize = Math.Clamp(w * 0.030, 10, 26);
+        };
+        return sp;
+    }
+
     // ------------------------------------------------------------------ bind/tex
-    private TabItem MkTab(string tag, Control c) => new() { Tag = tag, Header = "…", Content = c };
+    private TabItem MkTab(string tag, Control c, string ico, string key) =>
+        new() { Tag = tag, Header = TabHead(ico, key), Content = c };
+
+    /// <summary>Cabecera de pestana con icono, como en los gestores de archivos.</summary>
+    private Control TabHead(string ico, string key)
+    {
+        var sp = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        sp.Children.Add(Ico.Get(ico, 17, TextSoft));
+        var t = new TextBlock { Text = Txt(key), FontSize = 12.5, Foreground = TextMain, VerticalAlignment = VerticalAlignment.Center };
+        sp.Children.Add(t);
+        _texts.Add((key, () => { try { t.Text = Txt(key); } catch { } }));
+        return sp;
+    }
+
+    /// <summary>Texto de un clave, la busque donde este: Localization o Ex.</summary>
+    private static string Txt(string key)
+    {
+        var s = L.Get(key);
+        return s == key ? Ex.Get(key) : s;
+    }
 
     private void Bind(Control c, string key)
     {
@@ -1287,22 +1993,12 @@ public sealed partial class MainWindow : UserControl
     public void ReloadTexts()
     {
         foreach (var (_, set) in _texts) { try { set(); } catch { } }
-        if (_tabs != null)
-            foreach (var o in _tabs.Items)
-                if (o is TabItem ti)
-                    ti.Header = ti.Tag?.ToString() switch
-                    {
-                        TabExplorer => Ex.Get("tabExplorer"),
-                        TabQueue => L.Get("tabCopyList"),
-                        TabErrors => L.Get("tabErrors"),
-                        TabOptions => L.Get("tabInterface"),
-                        TabHistory => L.Get("tabHistory"),
-                        _ => ti.Header
-                    };
+        // Las cabeceras llevan icono, asi que se reconstruyen en vez de cambiar el
+        // texto: por eso no se tocan aqui, ya se actualizan solas desde _texts.
         if (_lbErrs != null) { _lbErrs.ItemsSource = null; _lbErrs.ItemsSource = _errLines; }
         RefreshIntegrationButton();
-        if (_bFold != null) _bFold.Content = Ex.Get("fold");
-        if (_bQuit != null) _bQuit.Content = L.Get("quit");
+        if (_bFold != null) _bFold.Content = Ico.Btn("fold", Ex.Get("fold"), TextMain, 18, 12);
+        if (_bQuit != null) _bQuit.Content = Ico.Btn("exit", L.Get("quit"), Gold, 18, 12);
         if (_lblStatus != null) _lblStatus.Text = StatusText();
         if (_cmbLang != null) _cmbLang.SelectedIndex = Ex.IndexOf(S.Lang);
         if (_cmbLangQuick != null) _cmbLangQuick.SelectedIndex = Ex.IndexOf(S.Lang);
@@ -1804,20 +2500,139 @@ public sealed partial class MainWindow : UserControl
         {
             if (_tray != null) { _tray.IsVisible = false; _tray.Dispose(); _tray = null; }
             if (!S.TrayIcon || _logoBmp == null) return;
-            _tray = new TrayIcon { Icon = new WindowIcon(_logoBmp), ToolTipText = "QBasCopier y Transfer", IsVisible = true };
-            _tray.Menu = new NativeMenu();
-            var mOpen = new NativeMenuItem("QBasCopier y Transfer");
-            mOpen.Click += (s, e) => { Show(); Activate(); };
-            var mQuit = new NativeMenuItem(L.Get("quit"));
-            mQuit.Click += (s, e) => DoQuit();
-            _tray.Menu.Items.Add(mOpen);
-            _tray.Menu.Items.Add(new NativeMenuItemSeparator());
-            _tray.Menu.Items.Add(mQuit);
+
+            _tray = new TrayIcon
+            {
+                Icon = new WindowIcon(_logoBmp),
+                ToolTipText = TrayToolTip(),
+                IsVisible = true
+            };
+
+            var menu = new NativeMenu();
+
+            // Doble clic en el icono: la ventana al frente, como todos los demas.
+            // Se engancha por reflexion porque segun la version de Avalonia el evento
+            // se llama Clicked y en otras no existe; con reflexion compila siempre.
+            var clicked = typeof(TrayIcon).GetEvent("Clicked");
+            if (clicked != null)
+                clicked.AddEventHandler(_tray, new EventHandler((_, _) => { RaiseFront(); }));
+
+            // El estado encendido se marca con un "v" delante del texto en vez de con
+            // IsChecked: asi el menu se ve igual en cualquier version de Avalonia y
+            // no depende de que el item admita casilla.
+            void Item(string text, Action go)
+            {
+                var it = new NativeMenuItem(text);
+                it.Click += (_, _) => go();
+                menu.Items.Add(it);
+            }
+
+            Item(MainWindow.AppFullName, () => { RaiseFront(); });
+            menu.Items.Add(new NativeMenuItemSeparator());
+
+            if (_running)
+            {
+                Item(L.Get("pause"), Pause);
+                Item(L.Get("cancel"), () => _engine?.Cancel());
+            }
+            else if (_engine != null)
+            {
+                Item(L.Get("resume"), Resume);
+            }
+            menu.Items.Add(new NativeMenuItemSeparator());
+
+            // Encender y apagar Transferir sin abrir la ventana: es el interruptor
+            // que mas se usa de la bandeja, porque deja de escuchar en la red.
+            var trOn = S.TransferOn;
+            Item((trOn ? "\u2713 " : "") + L.Get("transfer"), ToggleTransfer);
+            Item(L.Get("tabHistory"), () => { GoTab(TabHistory); RaiseFront(); });
+            menu.Items.Add(new NativeMenuItemSeparator());
+
+            Item((S.TrayIcon ? "✓ " : "") + L.Get("minToTray"), () => { S.TrayIcon = !S.TrayIcon; S.Save(); BuildTray(); }, true, () => S.TrayIcon);
+            Item((S.StartWithWindows ? "\u2713 " : "") + L.Get("startWithWindows"), () => { S.StartWithWindows = !S.StartWithWindows; S.Save(); ApplyStartWithWindows(S.StartWithWindows); ReloadTexts(); BuildTray(); });
+            Item((ExplorerIntegration.IsInstalled ? "✓ " : "") + L.Get("integrate"), ToggleIntegration, true, () => ExplorerIntegration.IsInstalled);
+            Item((ExplorerIntegration.IsDefaultCopier ? "✓ " : "") + "Ctrl+C / Ctrl+V", () => ToggleDefaultCopier(), true, () => ExplorerIntegration.IsDefaultCopier);
+            menu.Items.Add(new NativeMenuItemSeparator());
+
+            Item(L.Get("tabAbout"), () => { GoTab(TabAbout); RaiseFront(); });
+            Item(L.Get("quit"), DoQuit);
+
+            _tray.Menu = menu;
         }
         catch { }
 #endif
     }
 
+    /// <summary>
+    /// Trae la ventana al frente. En escritorio se-show y se activa la ventana real
+    /// (MainWindow es un UserControl y no tiene Show ni Activate); en Android se
+    /// levanta la Activity, que es lo unico que puede traerla.
+    /// </summary>
+    private void RaiseFront()
+    {
+        try
+        {
+#if ANDROID
+            var ctx = global::Android.App.Application.Context;
+            var i = global::Android.App.Application.Context.PackageManager!
+                .GetLaunchIntentForPackage(ctx.PackageName!);
+            if (i != null)
+            {
+                i.AddFlags(global::Android.Content.Intent.FlagActivityNewTask
+                         | global::Android.Content.Intent.FlagActivityResetTopIfNeeded);
+                ctx.StartActivity(i);
+            }
+#else
+            Host?.Show();
+            if (Host?.WindowState == WindowState.Minimized) Host.WindowState = WindowState.Normal;
+            Host?.Activate();
+            Host?.Focus();
+#endif
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// La tira de errores solo se ve cuando hay algo que contar. Antes ocupaba una
+    /// pestana entera siempre vacia.
+    /// </summary>
+    private void ShowErrBox()
+    {
+        if (_errBox == null || _lbErrs == null) return;
+        _errBox.IsVisible = _errLines.Count > 0;
+        _lbErrs.ItemsSource = null;
+        _lbErrs.ItemsSource = _errLines;
+    }
+
+    /// <summary>Texto del icono de la bandeja: que esta haciendo ahora mismo.</summary>
+    private string TrayToolTip()
+    {
+        var t = MainWindow.AppName;
+        if (_running)
+        {
+            var pc = _engine?.OverallPercent ?? 0;
+            var s = _lblCur?.Text ?? "";
+            t = $"{t} — {pc:0}%{(string.IsNullOrEmpty(s) ? "" : " · " + s)}";
+        }
+        else if (_queue.Count > 0) t = $"{t} — {L.Get("remaining")} {_queue.Count}";
+        return t.Length > 127 ? t[..127] : t; // el tooltip de Windows corta a 127
+    }
+
+    private void ToggleTransfer()
+    {
+        var on = !S.TransferOn;
+        ToggleTr(on);
+        if (_trToggle != null) _trToggle.IsChecked = on;
+        BuildTray();
+    }
+
+    private void ToggleDefaultCopier()
+    {
+        if (!ExplorerIntegration.SetAsDefaultCopier(!ExplorerIntegration.IsDefaultCopier))
+            _ = ConfirmAsync(L.Get("warning"), L.Get("errValue"));
+        BuildTray();
+        ReloadTexts();
+    }
     internal bool ForceClose { get => _forceClose; set => _forceClose = value; }
     internal bool TrayVisible => _tray is { IsVisible: true };
 
@@ -1927,6 +2742,27 @@ public static class Ex
     }
 
     public static string[] LangNames() => Rows.Select(r => r[0]).ToArray();
+
+    /// <summary>
+    /// Siglas para el desplegable. El nombre largo en un movil de 360 dp empujaba los
+    /// botones fuera de la pantalla, asi que se muestra solo el codigo de dos letras.
+    /// Para los que no son de dos letras se toma un nombre corto legible.
+    /// </summary>
+    public static string[] LangCodes() => Codes.Select(Code).ToArray();
+
+    private static string Code(string c)
+    {
+        c = c.ToLowerInvariant();
+        var two = c.Length >= 2 ? c[..2].ToUpperInvariant() : c.ToUpperInvariant();
+        return two switch
+        {
+            "ZH" => "ZH", "JA" => "JA", "KO" => "KO", "HI" => "HI", "AR" => "AR",
+            "UK" => "UK", "TR" => "TR", "CS" => "CS", "RO" => "RO", "ID" => "ID",
+            "VI" => "VI", "PL" => "PL", "NL" => "NL", "SV" => "SV", "FI" => "FI",
+            "PT" => "PT", "FR" => "FR", "DE" => "DE", "IT" => "IT", "ES" => "ES",
+            "EN" => "EN", _ => two
+        };
+    }
 
     public static string Get(string key)
     {

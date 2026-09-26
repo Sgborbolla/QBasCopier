@@ -5,21 +5,12 @@
              Background="{DynamicResource BgBase}">
     <!-- UserControl y no Window: en Android Avalonia no permite construir un Window
          (WindowingPlatformStub.CreateWindow lanza NotSupportedException), asi que la
-         UI tiene que ser un Control. En escritorio lo envuelve DesktopWindow. -->
+         UI tiene que ser un Control. En escritorio lo envuelve DesktopWindow.
+
+         La marca de agua y el pie los dibuja MainWindow.BuildBrandCredit() replicando
+         el bloque .brand-credit de QBasWing MyServer: fijo abajo a la izquierda,
+         dos lineas, transparente pero legible, y sin capturar toques. -->
     <Panel>
-        <Grid x:Name="Root" Margin="2"/>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center"
-                    IsHitTestVisible="False" Spacing="8">
-            <TextBlock x:Name="Watermark" Text="QBasCopier y Transfer" FontSize="120" FontWeight="Bold"
-                       Foreground="{DynamicResource Water}"
-                       HorizontalAlignment="Center"/>
-            <TextBlock Text="Asociado con Freeman y Diseños" FontSize="26"
-                       Foreground="{DynamicResource Water}"
-                       HorizontalAlignment="Center"/>
-        </StackPanel>
-        <TextBlock x:Name="WaterFooter" Text="QBasCopier y Transfer · © 2026 · Asociado con Freeman y Diseños"
-                   FontSize="15" Foreground="{DynamicResource Water}"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,6"
-                   IsHitTestVisible="False"/>
+        <Grid x:Name="Root"/>
     </Panel>
 </UserControl>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icono adaptativo dibujado con vectores, no con imagenes.
+
+  Por que: en un movil el icono se recorta con la forma que elige el lanzador
+  (circulo, cuadrado redondeado, gota). Un PNG cuadrado se ve cortado por el
+  borde y la estrella se ve partida. Con un vector el fondo ocupa todo y el
+  dibujo va centrado dentro de la zona segura de 66x66 de los 108x108, asi que
+  el lanzador lo recorta como quiera y nunca toca la marca.
+
+  Ademas pesa cero: ni un byte de imagen, que en una conexion lenta cuenta.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Fondo: azul de la bandera, con la franja roja de fondo. -->
+    <path
+        android:fillColor="#002A8F"
+        android:pathData="M0,0h108v108h-108z" />
+    <path
+        android:fillColor="#0A3FA8"
+        android:pathData="M0,0h108v30h-108z" />
+    <path
+        android:fillColor="#0A3FA8"
+        android:pathData="M0,78h108v30h-108z" />
+    <path
+        android:fillColor="#CF142B"
+        android:pathData="M0,34h108v7h-108z" />
+    <path
+        android:fillColor="#CF142B"
+        android:pathData="M0,67h108v7h-108z" />
+</vector>
