@@ -653,6 +653,38 @@ public static class L
           "Help", "Pomoc", "Справка", "Yardım", "مساعدة", "帮助",
           "ヘルプ", "도움말", "मदद", "Bantuan", "Hjälp", "Ohje", "Nápověda", "ช่วยเหลือ");
 
+        A("up", "Up", "Subir", "Subir", "Remonter", "Hoch", "Su", "Omhoog", "W górę",
+          "Вверх", "Fel", "إلى أعلى", "上",
+          "上へ", "위로", "ऊपर", "Na atas", "Upp", "Ylös", "Nahoru", "Nahor", "ขึ้น");
+        A("nothingHere", "Nothing here yet", "Aquí no hay nada aún", "Aqui não há nada ainda",
+          "Rien ici pour l’instant", "Hier ist noch nichts", "Qui non c’è ancora niente",
+          "Hier is nog niets", "Tu jeszcze nic tu nie ma", "Здесь пока пусто",
+          "Burada henüz yok", "لا شيء هنا بعد", "这里还没有东西",
+          "ここにはまだない", "여기 아직 없음", "यहाँ अभी कुछ नहीं", "Ma belum ada di sini",
+          "Inget här än", "Ei mitään vielä", "Zatím tu nic", "Zatiaľ tu nič", "ยังไม่มีอะไรที่นี่");
+        A("tapToMark", "Tap a file to mark it", "Toca un archivo para marcarlo", "Toque um arquivo para marcar",
+          "Touchez un fichier pour le cocher", "Datei antippen zum markieren", "Tocca un file per selezionarlo",
+          "Tik op een bestand om het te markeren", "Dotknij plik, aby go zaznaczyć", "Коснитесь файла, чтобы выбрать его",
+          "Bir dosyaya dokunun", "المس ملفًا لتحديده", "点按文件以选中",
+          "ファイルをタップして選択", "파일을 탭하여 선택", "फ़ाइल चुनने के लिए टैप करें", "المس ملفًا لتحديده",
+          "Tryck på en fil för att markera", "Napauta tiedostoa valitaksesi", "Kliknite na soubor pro označení",
+          "Kliknite na súbor pre označenie", "แตะไฟล์เพื่อทำเครื่องหมาย");
+        A("markedFmt", "{0} marked · {1}", "{0} marcados · {1}", "{0} marcados · {1}",
+          "{0} cochés · {1}", "{0} markiert · {1}", "{0} selezionati · {1}",
+          "{0} gemarkeerd · {1}", "Zaznaczono: {0} · {1}", "Выбрано: {0} · {1}",
+          "{0} işaretli · {1}", "المحدد: {0} · {1}", "已选 {0} 项 · {1}",
+          "{0} 選択しました · {1}", "{0}개 선택됨 · {1}", "चिन्हित: {0} · {1}", "المحدد: {0} · {1}",
+          "{0} markerade · {1}", "Valittu {0} · {1}", "Valittu {0} · {1}", "Označeno: {0} · {1}", "ทำเครื่องหมาย {0} รายการ · {1}");
+        A("addToList", "Add to list", "Añadir a la lista", "Adicionar à lista", "Ajouter à la liste",
+          "Zur Liste", "Aggiungi alla lista", "Aan lijst toevoegen", "Dodaj do listy", "Добавить в список",
+          "Listeye ekle", "إضافة إلى القائمة", "加入列表",
+          "リストに追加", "리스트에 추가", "सूची में जोड़ें", "إضافة إلى القائمة",
+          "Lägg till i listan", "Lisää listaan", "Přidat do seznamu", "Pridať do zoznamu", "添加到列表");
+        A("useAsDest", "Use as destination", "Usar como destino", "Usar como destino", "Utiliser comme destination",
+          "Als Ziel verwenden", "Usa come destinazione", "Als bestemming gebruiken", "Użyj jako miejsce docelowe",
+          "Использовать как папку", "Hedef olarak kullan", "استخدم كوجهة", "设为目的地",
+          "保存先にする", "대상으로 사용", "गंतव्य के रूप में उपयोग करें", "استخدم كوجهة",
+          "Använd som mål", "Käytä kohteena", "Použít jako cíl", "Použiť ako miesto príchodu", "设为目的地");
         A("transfer", "Transfer", "Transferir", "Transferir", "Transférer", "Übertragen", "Trasferisci",
           "Overdragen", "Transferuj", "Передать", "Aktar", "نقل", "传输",
           "転送", "전송", "स्थानांतरण", "Transfer", "Överför", "Siirrä", "Přenos", "ถ่ายโอน");

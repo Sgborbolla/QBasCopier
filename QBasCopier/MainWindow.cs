@@ -64,7 +64,6 @@ public sealed partial class MainWindow : UserControl
     private Button _bCopy = null!, _bMove = null!, _bPause = null!, _bResume = null!, _bSkip = null!, _bCancel = null!, _bClear = null!;
     private Button _bIntegrate = null!, _bFold = null!, _bQuit = null!;
     private ListBox _lbQueue = null!, _lbErrs = null!, _lbHist = null!;
-    private FilePane _left = null!, _right = null!;
     private WrapPanel _cmdBar = null!;
     private StackPanel _oneBar = null!;
     private Border _oneBox = null!;
@@ -1115,9 +1114,32 @@ public sealed partial class MainWindow : UserControl
 
     private Control BuildCopyTab()
     {
-        var panel = new StackPanel { Spacing = 6 };
+        var panel = new Grid
+        {
+            RowDefinitions =
+            {
+                new(GridLength.Star),   // el panel unico de archivos
+                new(GridLength.Auto)    // la barra de abajo
+            },
+            RowSpacing = 6
+        };
 
-        // Origen: una sola lista, como en un copiador normal. Nada de dos paneles.
+        // El panel unico: una sola lista de archivos, como en un copiador normal.
+        // Antes habia un par de rutas y dos listas (estilo Total Commander), que en
+        // un movil se veia regado. Se toca una carpeta para entrar, se tocan los
+        // archivos para marcarlos, y "Anadir a la lista" los pasa a la cola.
+        _explorer = new Explorer();
+        _explorer.FilesPicked += AddFiles;
+        _explorer.FolderChosen += p => { if (_tbTo != null) { _tbTo.Text = p; _ = StartCopy(false); } };
+        Grid.SetRow(_explorer, 0);
+        panel.Children.Add(_explorer);
+
+        var bottom = new StackPanel { Spacing = 6 };
+        Grid.SetRow(bottom, 1);
+        panel.Children.Add(bottom);
+
+        // Origen y destino. El destino arranca en la carpeta donde este el panel,
+        // que es lo que se quiere casi siempre: copiar a donde se esta mirando.
         var fromRow = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star), new(GridLength.Auto) } };
         _lblFrom = MkLbl("", 13);
         Grid.SetColumn(_lblFrom, 0); fromRow.Children.Add(_lblFrom);
@@ -1257,20 +1279,41 @@ public sealed partial class MainWindow : UserControl
         _bSkip.Padding = new Thickness(0);
         _bSkip.Margin = new Thickness(0);
 
-        panel.Children.Add(fromRow);
-        panel.Children.Add(toRow);
-        panel.Children.Add(_oneBox);
-        panel.Children.Add(_lbQueue);
-        panel.Children.Add(gl);
-        panel.Children.Add(_ggBar);
-        panel.Children.Add(_lblCur);
-        panel.Children.Add(errBox);
-        panel.Children.Add(_bSkip);
+        // Todo lo de abajo va en la segunda fila, encima de la barra de comandos
+        // global, que se queda fijada abajo al alcance del pulgar.
+        var queueBox = new Grid
+        {
+            RowDefinitions =
+            {
+                new(GridLength.Auto),   // barra individual
+                new(GridLength.Auto),   // herramientas de la lista
+                new(GridLength.Star),   // la cola
+                new(GridLength.Auto),   // progreso
+                new(GridLength.Auto)    // errores
+            },
+            RowSpacing = 4,
+            Height = 210
+        };
+        Grid.SetRow(_oneBox, 0); queueBox.Children.Add(_oneBox);
+        Grid.SetRow(tools, 1); queueBox.Children.Add(tools);
+        Grid.SetRow(_lbQueue, 2); queueBox.Children.Add(_lbQueue);
+        Grid.SetRow(gl, 3); queueBox.Children.Add(gl);
+        _ggBar.Margin = new Thickness(0, 2, 0, 0);
+        Grid.SetRow(_ggBar, 4); queueBox.Children.Add(_ggBar);
+
+        bottom.Children.Add(fromRow);
+        bottom.Children.Add(toRow);
+        bottom.Children.Add(queueBox);
+        bottom.Children.Add(_lblCur);
+        bottom.Children.Add(errBox);
+        bottom.Children.Add(_bSkip);
 
         Bind(_lblFrom, "histFrom");
         Bind(lblTo, "histTo");
         return panel;
     }
+
+    private Explorer? _explorer;
 
     private Border? _errBox;
 
@@ -1283,15 +1326,18 @@ public sealed partial class MainWindow : UserControl
         _oneLbl.Text = sel[0].Name;
     }
 
-    /// <summary>Copiar o mover solo el elemento marcado, sin tocar el resto de la lista.</summary>
+    /// <summary>
+    /// Copiar o mover solo el elemento marcado, sin tocar el resto de la lista.
+    /// El resto se aparta a _oneShot y se vuelve a poner en OnBatchEnd: antes se
+    /// perdia de la pantalla, que era justo lo que no debia pasar.
+    /// </summary>
     private void RunOne(bool move)
     {
         if (_lbQueue.SelectedItems.Cast<CopyItem>().FirstOrDefault() is not { } it) return;
-        var rest = _queue.Where(x => !ReferenceEquals(x, it)).ToList();
+        _oneShot = _queue.Where(x => !ReferenceEquals(x, it)).ToList();
         _queue.Clear();
         _queue.Add(it);
         _engine = null;
-        _oneShot = rest;
         _ = StartCopy(move);
     }
 
@@ -1464,8 +1510,6 @@ public sealed partial class MainWindow : UserControl
         var root = this.FindControl<Grid>("Root");
         if (root != null && _sheet != null) root.Children.Remove(_sheet);
         _sheet = null;
-    }
-        _lbQueue.SelectAll();
     }
 
     private static Control BuildQueueRow(CopyItem it)
@@ -2351,6 +2395,14 @@ public sealed partial class MainWindow : UserControl
     {
         var done = _engine?.DoneBytes ?? 0;
         _engine = null;
+        // Si era una copia de un solo elemento, el resto de la lista vuelve.
+        if (_oneShot is { Count: > 0 })
+        {
+            var back = _oneShot;
+            _oneShot = null;
+            foreach (var x in back) _queue.Add(x);
+            RefreshQueueUi();
+        }
         await HistoryStore.AppendAsync(_tbFrom.Text ?? "", _tbTo.Text ?? "", cancelled ? L.Get("histCancelled") : err > 0 ? L.Get("histErrors") : L.Get("histOk"), done);
         RefreshHistory();
         if (S.AfterDone == "close" || (S.AfterDone == "keepIfErrors" && err == 0)) DoQuit();
@@ -2465,9 +2517,7 @@ public sealed partial class MainWindow : UserControl
     }
 
     // ----------------------------------------------------------- explorador
-    private void PaneCopy(bool toLeft) => Transfer((toLeft ? _right : _left).SelectedPaths, (toLeft ? _left : _right).CurrentPath, false);
-    private void PaneMove(bool toLeft) => Transfer((toLeft ? _right : _left).SelectedPaths, (toLeft ? _left : _right).CurrentPath, true);
-
+    /// <summary>Copiar o mover lo que hay marcado en el panel, a donde se marque.</summary>
     private void Transfer(List<string> paths, string dest, bool move)
     {
         if (paths.Count == 0 || string.IsNullOrEmpty(dest)) return;

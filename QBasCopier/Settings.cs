@@ -55,6 +55,13 @@ public sealed class Settings
     public bool TransferAuto { get; set; }
     public string DeviceName { get; set; } = "";
 
+    /// <summary>
+    /// Ultima carpeta del panel unico, para reabrir donde se estaba. En Android es
+    /// un content:// de SAF, y por eso hace falta el permiso persistente: sin el, al
+    /// reiniciar la app el ContentResolver ya no resuelve el arbol.
+    /// </summary>
+    public string ExplorerLast { get; set; } = "";
+
     [JsonIgnore] public static string Dir
     {
         get
