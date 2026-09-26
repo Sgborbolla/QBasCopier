@@ -408,9 +408,9 @@ public sealed class CopyEngine
     {
         using var src = QBasCopier.Android.DroidList.Open(it.SourcePath);
         int buf = (int)Math.Clamp(S.BufferBytes, 64 * 1024, 64 * 1024 * 1024);
-        var dir = Path.GetDirectoryName(it.DestPath);
-        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-        await using var dst = new FileStream(it.DestPath, FileMode.Create, FileAccess.Write, FileShare.None, buf, true);
+        var dstStream = OpenDestWrite(it.DestPath, FileMode.Create, buf);
+        if (dstStream == null) throw new IOException("No se pudo escribir en: " + it.DestPath);
+        await using var dst = dstStream;
         var buffer = new byte[buf];
         long done = 0;
         while (true)
@@ -506,8 +506,8 @@ public sealed class CopyEngine
 
         await using var src = new FileStream(it.SourcePath, FileMode.Open, FileAccess.Read, FileShare.Read, buf, true);
         long offset = 0;
-        FileStream dst;
-        if (resume && File.Exists(it.DestPath))
+        Stream dst;
+        if (resume && !IsSafPath(it.DestPath) && File.Exists(it.DestPath))
         {
             var ds = new FileInfo(it.DestPath);
             if (ds.Length < sourceLen)
@@ -519,7 +519,11 @@ public sealed class CopyEngine
             else { CleanupPartial(it); throw new IOException("Destination same or larger"); }
         }
         else
-            dst = new FileStream(it.DestPath, FileMode.Create, FileAccess.Write, FileShare.None, buf, true);
+        {
+            var d = OpenDestWrite(it.DestPath, FileMode.Create, buf);
+            if (d == null) throw new IOException("No se pudo escribir en: " + it.DestPath);
+            dst = d;
+        }
 
         src.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[buf];
@@ -551,15 +555,22 @@ public sealed class CopyEngine
 
     private async Task CopyDirectoryAsync(CopyItem it, CancellationToken ct)
     {
-        Directory.CreateDirectory(it.DestPath);
+        // En Android el destino puede ser una carpeta SAF (content://). No existe en el
+        // sistema de archivos, asi que no se puede crear con Directory.CreateDirectory:
+        // DocumentsContract crea las carpetas solas al crear el documento hijo.
+        if (!IsSafPath(it.DestPath)) Directory.CreateDirectory(it.DestPath);
         long acc = 0;
         foreach (var file in Directory.EnumerateFiles(it.SourcePath, "*", SearchOption.AllDirectories))
         {
             _gate.Wait(ct);
             ct.ThrowIfCancellationRequested();
             var rel = Path.GetRelativePath(it.SourcePath, file);
-            var target = Path.Combine(it.DestPath, rel);
-            Directory.CreateDirectory(Path.GetDirectoryName(target) ?? it.DestPath);
+            var target = CombineDest(it.DestPath, rel);
+            if (!IsSafPath(target))
+            {
+                var pd = Path.GetDirectoryName(target);
+                if (!string.IsNullOrEmpty(pd)) Directory.CreateDirectory(pd);
+            }
             var sub = new CopyItem { SourcePath = file, DestPath = target, TotalBytes = new FileInfo(file).Length };
             await CopyFileWithEngineAsync(sub, false, ct);
             acc += sub.TotalBytes;
@@ -567,6 +578,43 @@ public sealed class CopyEngine
             ItemStatus?.Invoke(it);
             TotalsChanged?.Invoke();
         }
+    }
+
+    /// <summary>
+    /// Solo Android. Abre un destino content:// de SAF: (uriCarpeta, nombreArchivo) -> Stream.
+    /// Lo asigna MainActivity al arrancar. En PC se queda null y se usa FileStream.
+    /// </summary>
+    public static Func<string, string, Stream?>? SafOpenDest { get; set; }
+
+    /// <summary>True si la ruta es un content:// de SAF (solo Android).</summary>
+    public static bool IsSafPath(string p) =>
+        p.StartsWith("content://", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Une subruta con un destino SAF conservando el esquema content://.</summary>
+    private static string CombineDest(string dir, string rel)
+    {
+        if (!IsSafPath(dir)) return Path.Combine(dir, rel);
+        var slash = dir.EndsWith("/") ? dir : dir + "/";
+        return slash + rel.Replace('\\', '/');
+    }
+
+    /// <summary>
+    /// Abre el destino para escribir. En Android el destino puede ser un documento SAF,
+    /// y en Android 11+ escribir con FileStream en /storage/emulated/0 esta prohibido
+    /// (scoped storage), por eso se delega en DocumentsContract.
+    /// </summary>
+    private static Stream? OpenDestWrite(string destPath, FileMode mode, int buf)
+    {
+        if (IsSafPath(destPath) && SafOpenDest != null)
+        {
+            var i = destPath.LastIndexOf('/');
+            var dir = i > 0 ? destPath.Substring(0, i) : destPath;
+            var name = i >= 0 ? destPath.Substring(i + 1) : destPath;
+            return SafOpenDest(dir, name);
+        }
+        return new FileStream(destPath, mode, FileAccess.Write, FileShare.None, buf, true);
+    }
+
     }
 
     private void CopyMetadata(CopyItem it)

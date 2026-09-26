@@ -90,6 +90,51 @@ public static class DroidDir
         }
         catch { return ""; }
     }
+    /// <summary>
+    /// Abre un archivo dentro de una carpeta SAF para escritura, sobrescribiendo si ya existe.
+    /// DocumentsContract.CreateDocument siempre crea uno nuevo (y el explorador le anade
+    /// " (1)" al nombre), asi que primero se busca el documento con ese nombre.
+    /// </summary>
+    public static Stream? OpenForWriteIn(string dirUri, string fileName)
+    {
+        try
+        {
+            var cr = MainActivity.Current?.ContentResolver;
+            if (cr == null) return null;
+            var pu = global::Android.Net.Uri.Parse(dirUri);
+            if (pu == null) return null;
+            var treeId = global::Android.Provider.DocumentsContract.GetTreeDocumentId(pu);
+            if (treeId == null) return null;
+
+            var kidsUri = global::Android.Provider.DocumentsContract.BuildChildDocumentsUriUsingTree(pu, treeId);
+            using (var c = cr.Query(kidsUri, null, null, null, null))
+            {
+                if (c != null)
+                {
+                    int ciName = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDisplayName);
+                    int ciId = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDocumentId);
+                    if (ciName >= 0 && ciId >= 0 && c.MoveToFirst())
+                    {
+                        do
+                        {
+                            if (c.GetString(ciName) == fileName)
+                            {
+                                var exist = global::Android.Provider.DocumentsContract.BuildDocumentUri(
+                                    pu.Authority ?? "", c.GetString(ciId) ?? "");
+                                // "wt" = escribe y trunca: sobrescribe el archivo entero.
+                                return cr.OpenOutputStream(exist, "wt");
+                            }
+                        } while (c.MoveToNext());
+                    }
+                }
+            }
+
+            var doc = global::Android.Provider.DocumentsContract.CreateDocument(cr, pu, "application/octet-stream", fileName);
+            if (doc == null) return null;
+            return cr.OpenOutputStream(doc, "wt");
+        }
+        catch { return null; }
+    }
 }
 
 public static class DroidList
@@ -244,6 +289,7 @@ public class MainActivity : AvaloniaMainActivity<App>
         QBasCopier.TransferHost.DocInfo = DroidFile.Info;
         QBasCopier.TransferHost.ListDoc = DroidList.Children;
         QBasCopier.TransferHost.WriteDoc = DroidDir.OpenForWrite;
+        QBasCopier.CopyEngine.SafOpenDest = DroidDir.OpenForWriteIn;
         base.OnCreate(savedInstanceState);
     }
 
