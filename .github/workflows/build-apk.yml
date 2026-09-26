@@ -58,3 +58,50 @@ jobs:
           cp "$apk" "QBasCopier-y-Transfer-v1.2.apk"
           gh release delete v1.2-apk --yes --cleanup-tag >/dev/null 2>&1 || true
           gh release create v1.2-apk "QBasCopier-y-Transfer-v1.2.apk" --title "QBasCopier y Transfer 1.2" --notes "Version Android para celular. Compilada con GitHub Actions."
+
+  # ---------------------------------------------------------------- escritorio
+  # El .exe de PC es un entregable aparte: mismo codigo, otro TFM (net10.0) y otro SDK.
+  build_exe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Instalar .NET SDK 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publicar el .exe de Windows (portatil, un solo archivo)
+        run: |
+          set -e
+          dotnet publish "QBasCopier/QBasCopier.csproj" -c Release -r win-x64 \
+            --self-contained true -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o dist/windows
+          ls -la dist/windows
+
+      - name: Empaquetar en ZIP
+        run: |
+          set -e
+          cp dist/windows/QBasCopier.exe "dist/windows/QBasCopier-y-Transfer.exe"
+          cd dist && zip -q -r "../QBasCopier-y-Transfer-v1.2-win-x64.zip" windows
+          cd ..
+          ls -la QBasCopier-y-Transfer-v1.2-win-x64.zip
+
+      - name: Subir el .exe como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBasCopier-y-Transfer-v1.2-win-x64
+          path: QBasCopier-y-Transfer-v1.2-win-x64.zip
+          if-no-files-found: error
+
+      - name: Publicar el .exe en un release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release delete v1.2-win --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create v1.2-win "QBasCopier-y-Transfer-v1.2-win-x64.zip" \
+            --title "QBasCopier y Transfer 1.2 para Windows" \
+            --notes "Portable de 64 bits. Descomprime y ejecuta QBasCopier-y-Transfer.exe. No necesita instalar nada."
