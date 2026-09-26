@@ -615,8 +615,6 @@ public sealed class CopyEngine
         return new FileStream(destPath, mode, FileAccess.Write, FileShare.None, buf, true);
     }
 
-    }
-
     private void CopyMetadata(CopyItem it)
     {
         if (it.IsContent) return;
