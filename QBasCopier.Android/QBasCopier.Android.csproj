@@ -12,13 +12,13 @@
     <AssemblyName>QBasCopier</AssemblyName>
     <AndroidManifest>Properties/AndroidManifest.xml</AndroidManifest>
     <AcceptAndroidSDKLicenses>true</AcceptAndroidSDKLicenses>
-    <!-- arm64 (modernos) + armv7 (viejos/tabletas baratas) + x86_64 (emuladores) = instalable en practicamente todo -->
-    <AndroidSupportedAbis>arm64-v8a;armeabi-v7a;x86_64</AndroidSupportedAbis>
+    <!-- arm64 (modernos) + armv7 (viejos/tabletas baratas) + x64 (emuladores) = instalable en practicamente todo.
+         OJO: antes se usaba AndroidSupportedAbis, que el SDK ya ignora (warning XA0036), por eso el
+         APK anterior pesaba 42 MB con todas las ABIs dentro. -->
+    <RuntimeIdentifiers>android-arm;android-arm64;android-x64</RuntimeIdentifiers>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidLinkMode>SdkOnly</AndroidLinkMode>
     <RunAOTCompilation>false</RunAOTCompilation>
-    <ApplicationIcon>mipmap/ic_launcher</ApplicationIcon>
-    <ApplicationRoundIcon>mipmap/ic_launcher_round</ApplicationRoundIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,8 +33,6 @@
          "You need to use a Theme.AppCompat theme (or descendant) with this activity". -->
     <PackageReference Include="Xamarin.AndroidX.AppCompat" Version="1.7.0.1" />
     <AndroidResource Include="Resources/values/styles.xml" />
-    <AndroidResource Include="Resources/mipmap-anydpi-v26/ic_launcher.xml" />
-    <AndroidResource Include="Resources/mipmap-anydpi-v26/ic_launcher_round.xml" />
   </ItemGroup>
 
   <ItemGroup>
