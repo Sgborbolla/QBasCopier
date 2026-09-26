@@ -2,6 +2,11 @@ name: Compilar APK QBasWing Shuttle
 
 on:
   workflow_dispatch:          # boton "Run workflow" en la pestana Actions
+    inputs:
+      publicar:
+        description: 'Publicar el release. Dejalo en NO mientras la app este a medias.'
+        type: boolean
+        default: false
   push:
     branches: [ main, master ]
 
@@ -47,6 +52,10 @@ jobs:
           if-no-files-found: error
 
       - name: Publicar el APK en un release
+        # Solo si alguien lo pide a mano. Antes esto iba en cada push y subia una
+        # APK sin terminar al release, que es justo lo que no hay que hacer: el
+        # push sirve para compilar y nada mas.
+        if: ${{ inputs.publicar == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -97,6 +106,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publicar el .exe en un release
+        if: ${{ inputs.publicar == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

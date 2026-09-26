@@ -2598,10 +2598,10 @@ public sealed partial class MainWindow : UserControl
             Item(L.Get("tabHistory"), () => { GoTab(TabHistory); RaiseFront(); });
             menu.Items.Add(new NativeMenuItemSeparator());
 
-            Item((S.TrayIcon ? "✓ " : "") + L.Get("minToTray"), () => { S.TrayIcon = !S.TrayIcon; S.Save(); BuildTray(); }, true, () => S.TrayIcon);
+            Item((S.TrayIcon ? "✓ " : "") + L.Get("minToTray"), () => { S.TrayIcon = !S.TrayIcon; S.Save(); BuildTray(); });
             Item((S.StartWithWindows ? "\u2713 " : "") + L.Get("startWithWindows"), () => { S.StartWithWindows = !S.StartWithWindows; S.Save(); ApplyStartWithWindows(S.StartWithWindows); ReloadTexts(); BuildTray(); });
-            Item((ExplorerIntegration.IsInstalled ? "✓ " : "") + L.Get("integrate"), ToggleIntegration, true, () => ExplorerIntegration.IsInstalled);
-            Item((ExplorerIntegration.IsDefaultCopier ? "✓ " : "") + "Ctrl+C / Ctrl+V", () => ToggleDefaultCopier(), true, () => ExplorerIntegration.IsDefaultCopier);
+            Item((ExplorerIntegration.IsInstalled ? "✓ " : "") + L.Get("integrate"), ToggleIntegration);
+            Item((ExplorerIntegration.IsDefaultCopier ? "✓ " : "") + "Ctrl+C / Ctrl+V", ToggleDefaultCopier);
             menu.Items.Add(new NativeMenuItemSeparator());
 
             Item(L.Get("tabAbout"), () => { GoTab(TabAbout); RaiseFront(); });
