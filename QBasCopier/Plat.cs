@@ -24,8 +24,8 @@ public static class Plat
             var uri = global::AndroidX.Core.Content.FileProvider.GetUriForFile(
                 ctx, ctx.PackageName + ".fileprovider", new global::Java.IO.File(dir));
             var i = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
-            i.SetDataAndType(uri, global::Android.Content.ContentResolver.TypeDirectory);
-            i.AddFlags(global::Android.Content.Intent.ActivityFlags.NewTask);
+            i.SetDataAndType(uri, global::Android.Provider.DocumentsContract.Document.MimeTypeDir);
+            i.AddFlags(global::Android.Content.ActivityFlags.NewTask);
             ctx.StartActivity(i);
 #else
             Process.Start(new ProcessStartInfo
@@ -52,7 +52,7 @@ public static class Plat
             var mime = global::Android.Webkit.MimeTypeMap.Singleton.GetMimeTypeFromExtension(System.IO.Path.GetExtension(path)) ?? "*/*";
             var i = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
             i.SetDataAndType(uri, mime);
-            i.AddFlags(global::Android.Content.Intent.ActivityFlags.NewTask);
+            i.AddFlags(global::Android.Content.ActivityFlags.NewTask);
             ctx.StartActivity(i);
 #else
             Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });

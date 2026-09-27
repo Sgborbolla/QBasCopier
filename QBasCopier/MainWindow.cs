@@ -3474,8 +3474,8 @@ public sealed partial class MainWindow : UserControl
                 .GetLaunchIntentForPackage(ctx.PackageName!);
             if (i != null)
             {
-                i.AddFlags(global::Android.Content.Intent.ActivityFlags.NewTask
-                         | global::Android.Content.Intent.ActivityFlags.ResetTaskIfNeeded);
+                i.AddFlags(global::Android.Content.ActivityFlags.NewTask
+                         | global::Android.Content.ActivityFlags.ResetTaskIfNeeded);
                 ctx.StartActivity(i);
             }
 #else
