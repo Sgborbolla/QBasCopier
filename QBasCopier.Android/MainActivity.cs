@@ -354,13 +354,14 @@ public static class DroidDir
                 res.Add((QBasCopier.L.Get("volStorage"), Doc("primary:")));
             }
 
-            var sm = MainActivity.Current?.StorageManager;
-            var vols = sm?.Volumes;
+            global::Android.OS.Storage.StorageManager? sm = null;
+            try { if (MainActivity.Current != null) sm = global::Android.OS.Storage.StorageManager.FromContext(MainActivity.Current); } catch { }
+            var vols = sm?.StorageVolumes;
             if (vols != null)
                 foreach (var v in vols)
                 {
                     if (v == null) continue;
-                    if (v.State != global::Android.OS.VolumeState.Mounted && v.State != global::Android.OS.VolumeState.MountedReadOnly) continue;
+                    if (v.State != global::Android.OS.Environment.MediaMounted && v.State != global::Android.OS.Environment.MediaMountedReadOnly) continue;
                     string ruta = "";
                     try { ruta = v.GetPath() ?? ""; } catch { continue; }
                     ruta = ruta.TrimEnd('/');
@@ -446,7 +447,8 @@ public static class DroidDir
         try
         {
             if (!Directory.Exists(destino)) return "";
-            var sm = MainActivity.Current?.StorageManager;
+            global::Android.OS.Storage.StorageManager? sm = null;
+            try { if (MainActivity.Current != null) sm = global::Android.OS.Storage.StorageManager.FromContext(MainActivity.Current); } catch { }
             if (sm == null) return "";
 
             var vol = "primary";
@@ -463,7 +465,7 @@ public static class DroidDir
                 var uuid = sm.GetUuidForPath(destino);
                 if (uuid == null) return "";
                 string raiz = "";
-                var vols = sm.Volumes;
+                var vols = sm.StorageVolumes;
                 if (vols != null)
                     foreach (var v in vols)
                     {
