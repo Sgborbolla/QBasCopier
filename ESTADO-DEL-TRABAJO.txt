@@ -36,6 +36,33 @@ ESTADO DE VERIFICACION
         39 claves sin usar en el codigo (las imprime el propio script).
   [OK]  git diff --check
 
+POR ESTE ORDEN, MAÑANA
+-----------------------
+PASO 0 (primero de todo, y es lo unico que puede tumbar todo lo demas):
+  Compilar QBasCopier.Android en un equipo con el SDK. Ese proyecto NO se ha
+  compilado nunca y el codigo de SAF/volumenes que se escribio hoy esta sin
+  verificar. Antes de tocar mas cosas, que diga si compila:
+      dotnet build QBasCopier.Android/QBasCopier.Android.csproj -v q -nologo
+
+PASO 1 (el Bugs de logica 1 y 2, que son lo que impide que una carpeta llegue
+        entera al otro equipo; el 3, 4 y 5 son de los mismos freshly escritos):
+  1. Envoltura del protocolo de carpeta.
+  2. Carpetas vacias sin "/" al final.
+  3. DroidDir.Walk usa Info(...).Item3 y Info devuelve dos campos.
+  4. MainWindow.ApplyVolume llama a PickTreeAt con los argumentos al reves.
+  5. SendFilesWindow.Open devuelve null porque ShowDialog devuelve Task.
+
+PASO 2 (probar de verdad, no solo compilar):
+  Transferir una carpeta anidada grande entre dos equipos y comparar con SHA-256
+  calculado por fuera de la app. Si el paso 1 esta mal, esto lo canta enseguida.
+
+PASO 3: elegir CARPETA en Android para enviarla; SHA-256 extremo a extremo;
+  medir velocidad; quitar el limite de tamano de TransferHost.
+
+PASO 4: marca visible (QBasWing Shuttle en SetupLoc, README, titulo y el banner
+  del protocolo), 39 claves sin usar, coreano, CI, Directory.Build.props, y el
+  acabado visual.
+
 QUE SE ARREGLO HOY (todo el proyecto volvia a compilar)
 --------------------------------------------------------
 De codigo nuevo mio:
