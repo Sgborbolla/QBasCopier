@@ -293,14 +293,14 @@ public static class DroidDir
         var ficheros = new List<(string, string, long, DateTime)>();
         var vacias = new List<string>();
         var cola = new Queue<(string Uri, string Rel, int Depth)>();
-        cola.Enqueue((Root(treeUri), "", 0));
+        cola.Enqueue((DroidList.Root(treeUri), "", 0));
         try
         {
             while (cola.Count > 0)
             {
                 var (dir, rel, depth) = cola.Dequeue();
                 if (depth > 64) continue; // en un arbol ciclico no se entra mas
-                var hijos = Children(dir);
+                var hijos = DroidList.Children(dir);
                 var tiene = false;
                 foreach (var h in hijos)
                 {
@@ -354,13 +354,13 @@ public static class DroidDir
                 res.Add((QBasCopier.L.Get("volStorage"), Doc("primary:")));
             }
 
-            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as StorageManager;
+            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as global::Android.Storage.StorageManager;
             var vols = sm?.Volumes;
             if (vols != null)
                 foreach (var v in vols)
                 {
                     if (v == null) continue;
-                    if (v.State != VolumeState.Mounted && v.State != VolumeState.MountedReadOnly) continue;
+                    if (v.State != global::Android.Storage.VolumeState.Mounted && v.State != global::Android.Storage.VolumeState.MountedReadOnly) continue;
                     string ruta = "";
                     try { ruta = v.GetPath() ?? ""; } catch { continue; }
                     ruta = ruta.TrimEnd('/');
@@ -446,7 +446,7 @@ public static class DroidDir
         try
         {
             if (!Directory.Exists(destino)) return "";
-            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as StorageManager;
+            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as global::Android.Storage.StorageManager;
             if (sm == null) return "";
 
             var vol = "primary";
@@ -608,6 +608,28 @@ public static class DroidList
             ctx.StartActivity(i);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Sigue en pie lo que se guardo la ultima vez. Puede ser una ruta normal o un
+    /// content://, y en los dos casos puede haber desaparecido, asi que se pregunta de
+    /// verdad en vez de fiarse de la cadena guardada.
+    /// </summary>
+    public static bool Exists(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return false;
+        try
+        {
+            if (!path.StartsWith("content://", StringComparison.OrdinalIgnoreCase))
+                return File.Exists(path) || Directory.Exists(path);
+            var cr = MainActivity.Current?.ContentResolver;
+            var u = global::Android.Net.Uri.Parse(path);
+            if (cr == null || u == null) return false;
+            using var c = cr.Query(u, null, null, null, null);
+            if (c == null) return false;
+            return c.MoveToFirst();
+        }
+        catch { return false; }
     }
 }
 

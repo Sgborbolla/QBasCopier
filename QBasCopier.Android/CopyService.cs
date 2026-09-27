@@ -55,13 +55,7 @@ public class CopyService : Service
     {
         if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
         {
-            var ch = new NotificationChannel(ChannelId, "Progreso de copia y transferencia", NotificationImportance.Low)
-            {
-                Description = "Shows the progress of copies, moves and transfers",
-                ShowBadge = false,
-                EnableVibration = false,
-                Sound = null
-            };
+            var ch = new NotificationChannel(ChannelId, QBasCopier.MainWindow.AppName, NotificationImportance.Low);
             var mgr = (NotificationManager?)GetSystemService(NotificationService);
             mgr?.CreateNotificationChannel(ch);
         }
@@ -71,7 +65,7 @@ public class CopyService : Service
     {
         var b = new Notification.Builder(this, ChannelId)
             .SetContentTitle("QBasWing Shuttle")
-            .SetContentText(string.IsNullOrWhiteSpace(CurrentText) ? "Preparando…" : CurrentText)
+            .SetContentText(CurrentText)
             .SetSmallIcon(global::Android.Resource.Drawable.IcDialogInfo)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true);
@@ -85,37 +79,39 @@ public class CopyService : Service
             b.SetContentText(CurrentText + "  ·  " + CurrentSub);
 
         // Acciones directas desde la sombra de notificaciones.
-        var open = new PendingIntent.GetActivity(
-            this, 0,
-            PackageManager!.GetLaunchIntentForPackage(PackageName!)!.AddFlags(ActivityFlags.NewTask),
+        var abrir = PackageManager?.GetLaunchIntentForPackage(PackageName ?? "");
+        abrir?.AddFlags(ActivityFlags.NewTask);
+        var open = PendingIntent.GetActivity(this, 0, abrir,
             PendingIntentFlags.UpdateCurrent | PendingIntentFlags.Immutable);
 
-        var intents = new List<Intent>();
+        var acciones = new List<(string Label, PendingIntent Intent)>();
         if (CurrentPercent is > 0 and < 100)
         {
-            intents.Add(ActionIntent("pause", "pause"));
-            intents.Add(ActionIntent("cancel", "cancel"));
+            acciones.Add(("pause", ActionIntent("pause")));
+            acciones.Add(("cancel", ActionIntent("cancel")));
         }
         else
         {
-            intents.Add(ActionIntent("resume", "resume"));
+            acciones.Add(("resume", ActionIntent("resume")));
         }
-        b.AddAction(new Notification.Action.Builder(null, GetTextLabel("pause"), intents[0]).Build());
-        if (intents.Count > 1)
-            b.AddAction(new Notification.Action.Builder(null, GetTextLabel("cancel"), intents[1]).Build());
+        foreach (var (label, pi) in acciones)
+            b.AddAction(new Notification.Action.Builder(Icono(), new global::Java.Lang.String(GetTextLabel(label)), pi).Build());
 
         b.SetContentIntent(open);
         return b.Build();
     }
 
-    private string GetTextLabel(string k) => k switch
+    private static int Icono() => global::Android.Resource.Drawable.IcDialogInfo;
+
+    /// <summary>Texto de los botones del aviso, en el idioma que tenga la app puesta.</summary>
+    private static string GetTextLabel(string k) => k switch
     {
-        "pause" => "Pausar",
-        "cancel" => "Cancelar",
-        _ => "Reanudar"
+        "pause" => QBasCopier.L.Get("pause"),
+        "cancel" => QBasCopier.L.Get("cancel"),
+        _ => QBasCopier.L.Get("resume")
     };
 
-    private PendingIntent ActionIntent(string action, string cmd)
+    private PendingIntent ActionIntent(string cmd)
     {
         var i = new Intent(this, typeof(CopyService));
         i.SetAction(cmd);
@@ -140,8 +136,8 @@ public class CopyService : Service
         CurrentSub = sub;
         try
         {
-            var app = Application.Context;
-            var svc = app.GetSystemService(typeof(CopyService)) as CopyService;
+            var app = global::Android.App.Application.Context;
+            var svc = app.GetSystemService(global::Java.Lang.Class.FromType(typeof(CopyService))) as CopyService;
             if (svc != null) svc.StartInForeground();
         }
         catch { }
@@ -151,7 +147,7 @@ public class CopyService : Service
     {
         try
         {
-            var app = Application.Context;
+            var app = global::Android.App.Application.Context;
             var i = new Intent(app, typeof(CopyService));
             if (Build.VERSION.SdkInt >= BuildVersionCodes.O)
                 app.StartForegroundService(i);
@@ -165,7 +161,7 @@ public class CopyService : Service
     {
         try
         {
-            var app = Application.Context;
+            var app = global::Android.App.Application.Context;
             app.StopService(new Intent(app, typeof(CopyService)));
         }
         catch { }

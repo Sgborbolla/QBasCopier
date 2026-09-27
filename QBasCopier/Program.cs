@@ -44,6 +44,7 @@ public static class Program
         AppBuilder.Configure<App>().UsePlatformDetect().LogToTrace();
 #endif
 
+#if !ANDROID
     /// <summary>
     /// Convierte "--copy --from-shell -- ruta" en la lista completa de archivos
     /// marcados en el Explorador y su carpeta de destino. Si no viene del Explorador,
@@ -68,6 +69,8 @@ public static class Program
         if (!string.IsNullOrEmpty(dest)) { salida.Add("--dest"); salida.Add(dest); }
         return salida.ToArray();
     }
+
+#endif
 
     public static void ForwardCommand(string[] args)
     {

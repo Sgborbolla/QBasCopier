@@ -3115,7 +3115,10 @@ public sealed partial class MainWindow : UserControl
         _bResume.IsEnabled = false;
         _bSkip.IsEnabled = _bCancel.IsEnabled = true;
         _tabs.SelectedIndex = 1;
+#if !ANDROID
+        // En Android el progreso ya va en la notificacion del servicio en primer plano.
         AbreVentanita(move, dest!);
+#endif
 
         try { await _engine.RunAsync(); }
         catch { }
@@ -3137,9 +3140,12 @@ public sealed partial class MainWindow : UserControl
     }
 
     // ------------------------------------------------------- ventanita de copia
+    // Lanzada desde el menu del Explorador o de otro gestor: entonces la ventana
+    // principal no se enseña y lo unico en pantalla es la ventanita de progreso.
+    private bool _suelto;
+
 #if !ANDROID
     private CopyPopup? _pop;
-    private bool _suelto;      // lanzada desde el Explorador u otro gestor: sin ventana principal
 
     /// <summary>
     /// Al copiar o mover se abre la ventanita. Si la copia se lanzo desde el menu del
@@ -3468,8 +3474,8 @@ public sealed partial class MainWindow : UserControl
                 .GetLaunchIntentForPackage(ctx.PackageName!);
             if (i != null)
             {
-                i.AddFlags(global::Android.Content.Intent.FlagActivityNewTask
-                         | global::Android.Content.Intent.FlagActivityResetTopIfNeeded);
+                i.AddFlags(global::Android.Content.Intent.ActivityFlags.NewTask
+                         | global::Android.Content.Intent.ActivityFlags.ResetTaskIfNeeded);
                 ctx.StartActivity(i);
             }
 #else
@@ -3516,6 +3522,7 @@ public sealed partial class MainWindow : UserControl
         BuildTray();
     }
 
+#if !ANDROID
     private void ToggleDefaultCopier()
     {
         if (!ExplorerIntegration.SetAsDefaultCopier(!ExplorerIntegration.IsDefaultCopier))
@@ -3523,6 +3530,7 @@ public sealed partial class MainWindow : UserControl
         BuildTray();
         ReloadTexts();
     }
+#endif
     internal bool ForceClose { get => _forceClose; set => _forceClose = value; }
     internal bool TrayVisible => _tray is { IsVisible: true };
 

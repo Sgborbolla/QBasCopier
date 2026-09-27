@@ -17,14 +17,16 @@ public static class Plat
         {
             if (string.IsNullOrWhiteSpace(dir)) return;
 #if ANDROID
-            var uri = AndroidX.Core.Content.FileProviderHelper.GetUriForFile(
-                Android.App.Application.Context,
-                Android.App.Application.Context.PackageName + ".fileprovider",
-                new Java.IO.File(dir));
-            var i = new Android.Content.Intent(Android.Content.Intent.ActionView);
-            i.SetDataAndType(uri, Android.Content.ContentResolver.TypeDirectory);
-            i.AddFlags(Android.Content.Intent.FlagActivityNewTask);
-            Android.App.Application.Context.StartActivity(i);
+            // global:: porque, dentro de "namespace QBasCopier", el nombre "Android" se
+            // resolvia a QBasCopier.Android (el namespace del proyecto de Android) y no
+            // al de la plataforma, y estas llamadas no existian.
+            var ctx = global::Android.App.Application.Context;
+            var uri = global::AndroidX.Core.Content.FileProvider.GetUriForFile(
+                ctx, ctx.PackageName + ".fileprovider", new global::Java.IO.File(dir));
+            var i = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
+            i.SetDataAndType(uri, global::Android.Content.ContentResolver.TypeDirectory);
+            i.AddFlags(global::Android.Content.Intent.ActivityFlags.NewTask);
+            ctx.StartActivity(i);
 #else
             Process.Start(new ProcessStartInfo
             {
@@ -44,14 +46,14 @@ public static class Plat
         {
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
 #if ANDROID
-            var uri = AndroidX.Core.Content.FileProviderHelper.GetUriForFile(
-                Android.App.Application.Context,
-                Android.App.Application.Context.PackageName + ".fileprovider",
-                new Java.IO.File(path));
-            var i = new Android.Content.Intent(Android.Content.Intent.ActionView);
-            i.SetDataAndType(uri, Android.Webkit.MimeTypeMap.Singleton.GetMimeTypeFromExtension(System.IO.Path.GetExtension(path)) ?? "*/*");
-            i.AddFlags(Android.Content.Intent.FlagActivityNewTask);
-            Android.App.Application.Context.StartActivity(i);
+            var ctx = global::Android.App.Application.Context;
+            var uri = global::AndroidX.Core.Content.FileProvider.GetUriForFile(
+                ctx, ctx.PackageName + ".fileprovider", new global::Java.IO.File(path));
+            var mime = global::Android.Webkit.MimeTypeMap.Singleton.GetMimeTypeFromExtension(System.IO.Path.GetExtension(path)) ?? "*/*";
+            var i = new global::Android.Content.Intent(global::Android.Content.Intent.ActionView);
+            i.SetDataAndType(uri, mime);
+            i.AddFlags(global::Android.Content.Intent.ActivityFlags.NewTask);
+            ctx.StartActivity(i);
 #else
             Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
 #endif
