@@ -1,2 +1,7 @@
 dist/
 *.apk
+obj/
+bin/
+*.user
+.vs/
+.idea/

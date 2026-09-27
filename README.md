@@ -5,9 +5,9 @@ Programa multi-archivo ultrarrápido, con explorador doble, cola, barras en vivo
 (archivo + global, velocidad, tiempo transcurrido/restante), verificación SHA-256
 opcional, aviso de espacio en disco y **20 idiomas**.
 
-Basado en inspiración de copiadores conocidos (SuperCopier/TeraCopy),
-pero con motor, interfaz y textos 100% propios: paleta, logotipo y marca de
-agua "QBasCopier © 2026" de QBasWinG.
+Motor, interfaz y textos 100% propios: paleta, logotipo y marca de
+agua "QBasWing Shuttle © 2026" de QBasWinG. El comportamiento se ha diseñado
+desde cero, sin copiar código, textos ni aspecto de ninguna otra aplicación.
 
 ## Carpetas del proyecto
 

@@ -23,8 +23,8 @@ public sealed class Ent
 /// <summary>
 /// El panel unico de archivos.
 ///
-/// Antes habia un explorador de dos paneles al estilo Total Commander. En un
-/// movil se veia regado y apretado, asi que se sustituyo por una sola lista:
+/// Es una sola lista, no dos paneles: en un movil dos paneles se ven regados y
+/// apretados. Con una sola lista:
 /// se toca una carpeta para entrar, se tocan los archivos para marcarlos, y
 /// abajo estan las tres cosas que se hacen seguido (anadir a la lista, marcar
 /// todo, usar esta carpeta como destino).
@@ -42,6 +42,13 @@ public sealed class Explorer : UserControl
     private static readonly IBrush TextSoft = B("#9FB3E8");
     private static readonly IBrush Gold = B("#FBBF24");
     private static readonly IBrush Line = B("#1F3B8C");
+
+    /// <summary>
+    /// Los ajustes vivos. Los carga MainWindow al arrancar, asi que aqui se leen de
+    /// ahi en vez de tener copia propia: una copia se quedaria desincronizada al
+    /// cambiar el idioma o cualquier ajuste desde otra pantalla.
+    /// </summary>
+    private static Settings S => MainWindow.S;
 
     /// <summary>Carpetas por las que se ha pasado, para el boton de subir.</summary>
     private readonly List<string> _back = new();
@@ -88,7 +95,7 @@ public sealed class Explorer : UserControl
         _list.SelectionChanged += (_, _) => UpdateInfo();
 
         _up.Content = Ico.Get("arrowLeft", 18, TextSoft);
-        _up.ToolTip = L.Get("up");
+        ToolTip.SetTip(_up, L.Get("up"));
         _up.Width = 40; _up.Height = 36;
         _up.Background = BgRow;
         _up.BorderBrush = Line;
@@ -146,7 +153,7 @@ public sealed class Explorer : UserControl
         Grid.SetRow(head, 0); root.Children.Add(head);
         Grid.SetRow(_body, 1); root.Children.Add(_body);
 
-        var bar = new WrapPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        var bar = new WrapPanel { Orientation = Orientation.Horizontal };
         bar.Children.Add(Btn("check", "selectAll", SelectAll));
         bar.Children.Add(Btn("x", "deselectAll", () => _list.SelectedItems.Clear()));
         bar.Children.Add(Btn("plus", "addToList", () => FilesPicked?.Invoke(Selected())));
@@ -238,7 +245,10 @@ public sealed class Explorer : UserControl
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8),
             MinHeight = 38,
-            Padding = new Thickness(10, 4, 10, 4)
+            Padding = new Thickness(10, 4, 10, 4),
+            // WrapPanel no tiene separacion propia en Avalonia: el hueco entre
+            // botones se pone aqui, en cada boton.
+            Margin = new Thickness(0, 0, 6, 6)
         };
         b.Click += (_, _) => go();
         return b;

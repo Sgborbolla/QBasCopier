@@ -26,6 +26,17 @@ public static class L
         return a[i] ?? a[0] ?? key;
     }
 
+    /// <summary>
+    /// Texto con datos: L.F("trSelDirs", "3", "1"). Los {0}, {1}... se rellenan con
+    /// lo que se pase, en el orden del idioma.
+    /// </summary>
+    public static string F(string key, params object[] args)
+    {
+        var t = Get(key);
+        try { return args.Length == 0 ? t : string.Format(t, args); }
+        catch (Exception) { return t; }
+    }
+
     public static void SetLanguage(string l)
     {
         if (Array.IndexOf(Codes, l) >= 0) lang = l;
@@ -609,26 +620,26 @@ public static class L
           "Fatto da", "Gemaakt door", "Autor:", "Сделал", "Yapan",
           "صنع بواسطة", "制作", "作成者", "제작자", "निर्माता", "Dibuat oleh",
           "Skapad av", "Tekijä", "Autor", "สร้างโดย");
-        A("engineInfo", "SuperCopier-based parallel copy engine - blazing fast",
-          "Motor de copia paralela basado en SuperCopier - rapidísimo",
-          "Motor de cópia paralela baseado no SuperCopier - rapidíssimo",
-          "Moteur de copie parallèle inspiré de SuperCopier - très rapide",
-          "SuperCopier-basierter Parallelkopier-Motor - blitzschnell",
-          "Motore di copia parallela basato su SuperCopier - velocissimo",
-          "Op SuperCopier gebaseerde parallelle kopijmotor - razendsnel",
-          "Silnik równoległy oparty na SuperCopier - błyskawiczny",
-          "Движок на основе SuperCopier - супербыстрый",
-          "SuperCopier tabanlı paralel motor - çok hızlı",
-          "محرك نسخ متوازٍ مستند إلى SuperCopier - سريع للغاية",
-          "基于 SuperCopier 的并行复制引擎 - 闪电般快速",
-          "SuperCopier ベースの並列コピーエンジン - 超高速",
-          "SuperCopier 기반 병렬 엔진 - 초고속",
-          "SuperCopier-आधारित समानांतर इंजन - बेहद तेज़",
-          "Mesin salin paralel berbasis SuperCopier - sangat cepat",
-          "SuperCopier-baserad parallellmotor - blixtsnabb",
-          "SuperCopier-pohjainen rinnakkaismoottori - salamannopea",
-          "Paralelní jádro založené na SuperCopier - bleskurychlé",
-          "เอนจินคัดลอกแบบขนานบนพื้นฐาน SuperCopier - เร็วสุด ๆ");
+                A("engineInfo", "Our parallel copy engine — very fast",
+          "Nuestro motor de copia en paralelo: rapidísimo",
+          "O nosso motor de cópia em paralelo: rapidíssimo",
+          "Notre moteur de copie en parallèle : très rapide",
+          "Eigene parallele Kopier-Engine – blitzschnell",
+          "Il nostro motore di copia in parallelo: velocissimo",
+          "Eigen parallelle kopieermotor – razendsnel",
+          "Nasz silnik równoległego kopiowania – błyskawiczny",
+          "Наш параллельный движок копирования — очень быстрый",
+          "Kendi paralel kopyalama motorumuz — çok hızlı",
+          "محرك النسخ المتوازي الخاص بنا — سريع للغاية",
+          "我们的并行复制引擎 — 闪电般快速",
+          "自社並列コピーエンジン — 超高速",
+          "자사 병렬 복사 엔진 — 초고속",
+          "हमारा समानांतर कॉपी इंजन — बेहद तेज़",
+          "Mesin salin paralel kami — sangat cepat",
+          "Vår parallella kopieringsmotor – blixtsnabb",
+          "Oma rinnakkainen kopiointimoottorimme – salamannopea",
+          "Náš paralelní jádro kopírování — bleskurychlé",
+          "เอนจินคัดลอกแบบขนานของเรา — เร็วสุด ๆ");
         A("rights", "All rights reserved", "Todos los derechos reservados", "Todos os direitos reservados",
           "Tous droits réservés", "Alle Rechte vorbehalten", "Tutti i diritti riservati",
           "Alle rechten voorbehouden", "Wszelkie prawa zastrzeżone", "Все права защищены",
@@ -654,49 +665,119 @@ public static class L
           "ヘルプ", "도움말", "मदद", "Bantuan", "Hjälp", "Ohje", "Nápověda", "ช่วยเหลือ");
 
         A("up", "Up", "Subir", "Subir", "Remonter", "Hoch", "Su", "Omhoog", "W górę",
-          "Вверх", "Fel", "إلى أعلى", "上",
-          "上へ", "위로", "ऊपर", "Na atas", "Upp", "Ylös", "Nahoru", "Nahor", "ขึ้น");
-        A("nothingHere", "Nothing here yet", "Aquí no hay nada aún", "Aqui não há nada ainda",
-          "Rien ici pour l’instant", "Hier ist noch nichts", "Qui non c’è ancora niente",
-          "Hier is nog niets", "Tu jeszcze nic tu nie ma", "Здесь пока пусто",
-          "Burada henüz yok", "لا شيء هنا بعد", "这里还没有东西",
-          "ここにはまだない", "여기 아직 없음", "यहाँ अभी कुछ नहीं", "Ma belum ada di sini",
-          "Inget här än", "Ei mitään vielä", "Zatím tu nic", "Zatiaľ tu nič", "ยังไม่มีอะไรที่นี่");
-        A("tapToMark", "Tap a file to mark it", "Toca un archivo para marcarlo", "Toque um arquivo para marcar",
-          "Touchez un fichier pour le cocher", "Datei antippen zum markieren", "Tocca un file per selezionarlo",
-          "Tik op een bestand om het te markeren", "Dotknij plik, aby go zaznaczyć", "Коснитесь файла, чтобы выбрать его",
-          "Bir dosyaya dokunun", "المس ملفًا لتحديده", "点按文件以选中",
-          "ファイルをタップして選択", "파일을 탭하여 선택", "फ़ाइल चुनने के लिए टैप करें", "المس ملفًا لتحديده",
-          "Tryck på en fil för att markera", "Napauta tiedostoa valitaksesi", "Kliknite na soubor pro označení",
-          "Kliknite na súbor pre označenie", "แตะไฟล์เพื่อทำเครื่องหมาย");
-        A("markedFmt", "{0} marked · {1}", "{0} marcados · {1}", "{0} marcados · {1}",
-          "{0} cochés · {1}", "{0} markiert · {1}", "{0} selezionati · {1}",
-          "{0} gemarkeerd · {1}", "Zaznaczono: {0} · {1}", "Выбрано: {0} · {1}",
-          "{0} işaretli · {1}", "المحدد: {0} · {1}", "已选 {0} 项 · {1}",
-          "{0} 選択しました · {1}", "{0}개 선택됨 · {1}", "चिन्हित: {0} · {1}", "المحدد: {0} · {1}",
-          "{0} markerade · {1}", "Valittu {0} · {1}", "Valittu {0} · {1}", "Označeno: {0} · {1}", "ทำเครื่องหมาย {0} รายการ · {1}");
-        A("addToList", "Add to list", "Añadir a la lista", "Adicionar à lista", "Ajouter à la liste",
-          "Zur Liste", "Aggiungi alla lista", "Aan lijst toevoegen", "Dodaj do listy", "Добавить в список",
-          "Listeye ekle", "إضافة إلى القائمة", "加入列表",
-          "リストに追加", "리스트에 추가", "सूची में जोड़ें", "إضافة إلى القائمة",
-          "Lägg till i listan", "Lisää listaan", "Přidat do seznamu", "Pridať do zoznamu", "添加到列表");
-        A("useAsDest", "Use as destination", "Usar como destino", "Usar como destino", "Utiliser comme destination",
-          "Als Ziel verwenden", "Usa come destinazione", "Als bestemming gebruiken", "Użyj jako miejsce docelowe",
-          "Использовать как папку", "Hedef olarak kullan", "استخدم كوجهة", "设为目的地",
-          "保存先にする", "대상으로 사용", "गंतव्य के रूप में उपयोग करें", "استخدم كوجهة",
-          "Använd som mål", "Käytä kohteena", "Použít jako cíl", "Použiť ako miesto príchodu", "设为目的地");
-        A("trCreate", "Create", "Crear", "Criar", "Créer", "Erstellen", "Crea", "Maken", "Utwórz", "Создать", "Oluştur", "إنشاء", "创建", "作成", "만들기", "बनाएँ", "إنشاء", "Skapa", "Luo", "Vytvořit", "Vytvoriť", "创建");
-        A("trTurnOff", "Turn off", "Apagar", "Desligar", "Éteindre", "Ausschalten", "Spegni", "Uitschakelen", "Wyłącz", "Выключить", "Kapat", "إيقاف", "关闭", "オフ", "끄기", "बंद करें", "إيقاف", "Stäng av", "Sammuta", "Vypnout", "Vypnúť", "关闭");
-        A("trCreateTitle", "I want to send", "Quiero enviar", "Quero enviar", "Je veux envoyer", "Senden", "Voglio inviare", "Ik wil verzenden", "Chcę wysłać", "Отправить", "Göndermek", "أريد الإرسال", "我要发送", "送信する", "보내기", "मैं भेजना चाहता हूँ", "أريد الإرسال", "Skicka", "Lähetän", "Chci odeslat", "Chcem odoslať", "我要发送");
-        A("trJoinTitle", "I want to receive", "Quiero recibir", "Quero receber", "Je veux recevoir", "Empfangen", "Voglio ricevere", "Ik wil ontvangen", "Chcę odebrać", "Получить", "Almak", "أريد الاستلام", "我要接收", "受信する", "받기", "मैं प्राप्त करना चाहता हूँ", "أريد الاستلام", "Ta emot", "Vastaanottaa", "Chci přijmout", "Chcem prijať", "我要接收");
-        A("trJoin", "Join", "Unirse", "Entrar", "Rejoindre", "Beitreten", "Entra", "Deelnemen", "Dołącz", "Подключиться", "Katıl", "انضمام", "加入", "参加", "참여", "जुड़ें", "انضمام", "Gå med", "Liity", "Připojit", "Pripojiť", "加入");
-        A("trCodeHint", "Paste the code from the other device", "Pega el código del otro equipo", "Cole o código do outro dispositivo", "Collez le code de l’autre appareil", "Code vom anderen Gerät einfügen", "Incolla il codice dell’altro dispositivo", "Plak de code van het andere apparaat", "Wklej kod z drugiego urządzenia", "Вставьте код с другого устройства", "Diğer cihazdaki kodu yapıştır", "الصق الرمز من الجهاز الآخر", "粘贴另一台设备的代码", "他の端末のコードを貼り付け", "다른 기기의 코드를 붙여넣기", "दूसरे डिवाइस का कोड चिपकाएँ", "الصق الرمز من الجهاز الآخر", "Klistra koden från den andra enheten", "Liitä koodi toiselta laitteelta", "Vložte kód z druhého zařízení", "Vložte kód z iného zariadenia", "粘贴另一台设备的代码");
-        A("trJoinHint", "Scanning the QR needs the camera. If you do not have one, type or paste the code.", "Escanear el QR necesita la cámara. Si no tienes, escribe o pega el código.", "Ler o QR precisa da câmera. Se não tiver, escreva o código.", "Scanner le QR demande l’appareil photo. Sinon, tapez le code.", "Für den QR-Scan braucht es die Kamera. Sonst den Code einfügen.", "Per scansionare il QR serve la fotocamera. Se non ce l’hai, scrivi il codice.", "QR scannen kan met de camera. Zonder camera: plak de code.", "Skanowanie QR wymaga aparatu. Bez niego wklej kod.", "Для сканирования QR нужна камера. Без неё вставьте код.", "QR taramak için kamera gerekir. Yoksa kodu yazın.", "مسح رمز QR يحتاج كاميرا. بدونها الصق الرمز.", "扫二维码需要摄像头。没有的话粘贴代码。", "QRの読み取りにはカメラが必要です。없으면コードを貼り付けてください。", "QR을 읽으려면 카메라가 필요합니다. 없으면 코드를 붙여넣으세요.", "QR स्कैन करने के लिए कैमरा चाहिए। नहीं है तो कोड चिपकाएँ", "مسح رمز QR يحتاج كاميرا. بدونها الصق الرمز", "Att skanna QR behövs kameran. Saknar den: klistra koden.", "QR:n lukemiseen tarvitaan kameraa. Muuten liitä koodi.", "Skenování QR vyžaduje kameru. Bez ní vložte kód.", "Skenovanie QR vyžaduje kameru. Bez nej vložte kód.", "扫二维码需要摄像头。没有的话粘贴代码。");
-        A("trCodeEmpty", "Paste or type the code first", "Primero pega o escribe el código", "Primeiro cole ou escreva o código", "Collez ou tapez d’abord le code", "Erst den Code einfügen", "Prima scrivi o incolla il codice", "Eerst de code plakken of typen", "Najpierw wklej lub wpisz kod", "Сначала вставьте или введите код", "Önce kodu yapıştırın أو yazın", "الصق الرمز أو اكتبه أولا", "先粘贴或输入代码", "先にコードを貼り付けてください", "먼저 코드를 붙여넣거나 입력하세요", "पहले कोड चिपकाएँ या लिखें", "الصق الرمز أو اكتبه أولا", "Klistra eller skriv koden först", "Liitä tai kirjoita koodi ensin", "Nejprve vložte nebo napište kód", "Najprv vložte alebo napíšte kód", "先粘贴或输入代码");
-        A("trHotspot", "Turn on hotspot (no router needed)", "Encender hotspot (sin router)", "Ligar hotspot (sem router)", "Activer le partage de connexion", "Hotspot einschalten (ohne Router)", "Accendi l’hotspot (senza router)", "Hotspot aanzetten (geen router nodig)", "Włącz hotspot (bez routera)", "Включить точку доступа", "Hotspot aç (yönlendirici gerekmez)", "تشغيل نقطة الاتصال", "开启热点（无需路由器）", "ホットスポットをオン（ルーター不要）", "핫스팟 켜기 (라우터 불필요)", "हॉटस्पॉट चालू करें (राउटर की ज़रूरत नहीं)", "تشغيل نقطة الاتصال", "Slå på hotspot (ingen router behövs)", "Ota hotspot käyttöön (ei reitintä)", "Zapnout hotspot (bez routeru)", "Zapnúť hotspot (bez routera)", "开启热点（无需路由器）");
-        A("trHotspotAndroid", "On Android the hotspot is made from the quick settings of the system, so there is nothing to press here.", "En Android el hotspot se hace desde los ajustes rápidos del sistema, así que aquí no hay nada que pulsar.", "No Android o hotspot faz-se nos ajustes rápidos do sistema.", "Sur Android, le partage de connexion se fait depuis les réglages rapides.", "Unter Android wird der Hotspot über die Schnelleinstellungen gemacht.", "Su Android l’hotspot si fa dalle impostazioni rapide.", "Op Android maak je de hotspot via de snelleinstellingen.", "W Androidzie hotspot robi sie w szybkich ustawieniach.", "В Android хотспот включается в быстрых настройках.", "Android’da hotspot hızlı ayarlardan açılır.", "في أندرويد يتم تشغيل نقطة الاتصال من الإعدادات السريعة.", "安卓的热点头像在系统快捷设置里开启。", "Androidでは系统的クイック設定でオンにします。", "안드로임은 시스템 빠른 설정에서 켭니다.", "एंड्रॉइड में हॉटस्पॉट तेज़ सेटिंग से चालू होता है", "في أندرويد يتم تشغيل نقطة الاتصال من الإعدادات السريعة", "Op Android zet je de hotspot aan via de snelleinstellingen.", "Androidissa hotspot kytketään pika-asetuksista.", "V Androidu se hotspot zapne v rychlých nastaveních.", "V Androide sa hotspot zapne v rýchlych nastaveniach.", "安卓的热点头像在系统快捷设置里开启。");
-        A("trOn", "On: the other device can connect", "Encendido: el otro equipo puede conectarse", "Ligado: o outro dispositivo pode ligar-se", "Allumé : l’autre appareil peut se connecter", "An: das andere Gerät kann sich verbinden", "Acceso: l’altro dispositivo può connettersi", "Aan: het andere apparaat kan verbinden", "Włączone: drugie urządzenie może się połączyć", "Включено: другое устройство может подключиться", "Açık: diğer cihaz bağlanabilir", "مفعّل: يمكن للجهاز الآخر الاتصال", "已开启：对方可以连接", "オン：相手の端末が接続できます", "켜짐: 상대 기기가 연결할 수 있습니다", "चालू: दूसरा डिवाइस जुड़ सकता है", "مفعّل: يمكن للجهاز الآخر الاتصال", "På: den andra enheten kan ansluta", "Päällä: toinen laite voi liittyä", "Włączone: drugie urządzenie może się połączyć", "Zapnuté: druhé zariadenie sa môže pripojiť", "已开启：对方可以连接");
-        A("trOff", "Off: turn it on to transfer", "Apagado: enciéndelo para transferir", "Desligado: ligue para transferir", "Éteint : activez-le pour transférer", "Aus: zum Transfer einschalten", "Spento: accendilo per trasferire", "Uit: zet aan om te transfereren", "Wyłączone: włącz, aby przesyłać", "Выключено: включите для передачи", "Kapalı: açın ve aktarın", "مطفأ: شغّله للتحويل", "未开启：打开才能传输", "オフ：オンにすると転送できます", "꺼짐: 켜야 전송됩니다", "बंद: स्थानांतरण के लिए चालू करें", "مطفأ: شغّله للإرسال", "Av: slå på för att skicka", "Päällä siirtoa varten", "Vypnuto: zapněte pro přenos", "Vypnuté: zapnite na prenos", "未开启：打开才能传输");
+          "Вверх", "Fel", "إلى أعلى", "上", "上へ", "위로", "ऊपर", "Na atas",
+          "Upp", "Ylös", "Nahoru", "ขึ้น");
+        A("nothingHere", "Nothing here yet", "Aquí no hay nada aún", "Aqui não há nada ainda", "Rien ici pour l’instant", "Hier ist noch nichts", "Qui non c’è ancora niente", "Hier is nog niets", "Tu jeszcze nic tu nie ma",
+          "Здесь пока пусто", "Burada henüz yok", "لا شيء هنا بعد", "这里还没有东西", "ここにはまだない", "여기 아직 없음", "यहाँ अभी कुछ नहीं", "Ma belum ada di sini",
+          "Inget här än", "Ei mitään vielä", "Zatím tu nic", "ยังไม่มีอะไรที่นี่");
+        A("tapToMark", "Tap a file to mark it", "Toca un archivo para marcarlo", "Toque um arquivo para marcar", "Touchez un fichier pour le cocher", "Datei antippen zum markieren", "Tocca un file per selezionarlo", "Tik op een bestand om het te markeren", "Dotknij plik, aby go zaznaczyć",
+          "Коснитесь файла, чтобы выбрать его", "Bir dosyaya dokunun", "المس ملفًا لتحديده", "点按文件以选中", "ファイルをタップして選択", "파일을 탭하여 선택", "फ़ाइल चुनने के लिए टैप करें", "Ketuk file untuk menandainya",
+          "Tryck på en fil för att markera", "Napauta tiedostoa valitaksesi", "Kliknite na soubor pro označení", "แตะไฟล์เพื่อทำเครื่องหมาย");
+        A("markedFmt", "{0} marked · {1}", "{0} marcados · {1}", "{0} marcados · {1}", "{0} cochés · {1}", "{0} markiert · {1}", "{0} selezionati · {1}", "{0} gemarkeerd · {1}", "Zaznaczono: {0} · {1}",
+          "Выбрано: {0} · {1}", "{0} işaretli · {1}", "المحدد: {0} · {1}", "已选 {0} 项 · {1}", "{0} 選択しました · {1}", "{0}개 선택됨 · {1}", "चिन्हित: {0} · {1}", "{0} ditandai · {1}",
+          "{0} markerade · {1}", "Valittu {0} · {1}", "Označeno: {0} · {1}", "ทำเครื่องหมาย {0} รายการ · {1}");
+        A("addToList", "Add to list", "Añadir a la lista", "Adicionar à lista", "Ajouter à la liste", "Zur Liste", "Aggiungi alla lista", "Aan lijst toevoegen", "Dodaj do listy",
+          "Добавить в список", "Listeye ekle", "إضافة إلى القائمة", "加入列表", "リストに追加", "리스트에 추가", "सूची में जोड़ें", "Tambahkan ke daftar",
+          "Lägg till i listan", "Lisää listaan", "Přidat do seznamu", "เพิ่มลงในรายการ");
+        A("useAsDest", "Use as destination", "Usar como destino", "Usar como destino", "Utiliser comme destination", "Als Ziel verwenden", "Usa come destinazione", "Als bestemming gebruiken", "Użyj jako miejsce docelowe",
+          "Использовать как папку", "Hedef olarak kullan", "استخدم كوجهة", "设为目的地", "保存先にする", "대상으로 사용", "गंतव्य के रूप में उपयोग करें", "Gunakan sebagai tujuan",
+          "Använd som mål", "Käytä kohteena", "Použít jako cíl", "ใช้เป็นปลายทาง");
+        A("trCreate", "Create", "Crear", "Criar", "Créer", "Erstellen", "Crea", "Maken", "Utwórz",
+          "Создать", "Oluştur", "إنشاء", "创建", "作成", "만들기", "बनाएँ", "Buat",
+          "Skapa", "Luo", "Vytvořit", "สร้าง");
+        A("trTurnOff", "Turn off", "Apagar", "Desligar", "Éteindre", "Ausschalten", "Spegni", "Uitschakelen", "Wyłącz",
+          "Выключить", "Kapat", "إيقاف", "关闭", "オフ", "끄기", "बंद करें", "Matikan",
+          "Stäng av", "Sammuta", "Vypnout", "ปิด");
+        A("trCreateTitle", "I want to send", "Quiero enviar", "Quero enviar", "Je veux envoyer", "Senden", "Voglio inviare", "Ik wil verzenden", "Chcę wysłać",
+          "Отправить", "Göndermek", "أريد الإرسال", "我要发送", "送信する", "보내기", "मैं भेजना चाहता हूँ", "Saya ingin mengirim",
+          "Skicka", "Lähetän", "Chci odeslat", "ฉันต้องการส่ง");
+        A("trJoinTitle", "I want to receive", "Quiero recibir", "Quero receber", "Je veux recevoir", "Empfangen", "Voglio ricevere", "Ik wil ontvangen", "Chcę odebrać",
+          "Получить", "Almak", "أريد الاستلام", "我要接收", "受信する", "받기", "मैं प्राप्त करना चाहता हूँ", "Saya ingin menerima",
+          "Ta emot", "Vastaanottaa", "Chci přijmout", "ฉันต้องการรับ");
+        A("trJoin", "Join", "Unirse", "Entrar", "Rejoindre", "Beitreten", "Entra", "Deelnemen", "Dołącz",
+          "Подключиться", "Katıl", "انضمام", "加入", "参加", "참여", "जुड़ें", "Gabung",
+          "Gå med", "Liity", "Připojit", "เข้าร่วม");
+        A("trCodeHint", "Paste the code from the other device", "Pega el código del otro equipo", "Cole o código do outro dispositivo", "Collez le code de l’autre appareil", "Code vom anderen Gerät einfügen", "Incolla il codice dell’altro dispositivo", "Plak de code van het andere apparaat", "Wklej kod z drugiego urządzenia",
+          "Вставьте код с другого устройства", "Diğer cihazdaki kodu yapıştır", "الصق الرمز من الجهاز الآخر", "粘贴另一台设备的代码", "他の端末のコードを貼り付け", "다른 기기의 코드를 붙여넣기", "दूसरे डिवाइस का कोड चिपकाएँ", "Tempel kode dari perangkat lain",
+          "Klistra koden från den andra enheten", "Liitä koodi toiselta laitteelta", "Vložte kód z druhého zařízení", "วางรหัสจากอุปกรณ์อื่น");
+        A("trJoinHint", "Scanning the QR needs the camera. If you do not have one, type or paste the code.", "Escanear el QR necesita la cámara. Si no tienes, escribe o pega el código.", "Ler o QR precisa da câmera. Se não tiver, escreva o código.", "Scanner le QR demande l’appareil photo. Sinon, tapez le code.", "Für den QR-Scan braucht es die Kamera. Sonst den Code einfügen.", "Per scansionare il QR serve la fotocamera. Se non ce l’hai, scrivi il codice.", "QR scannen kan met de camera. Zonder camera: plak de code.", "Skanowanie QR wymaga aparatu. Bez niego wklej kod.",
+          "Для сканирования QR нужна камера. Без неё вставьте код.", "QR taramak için kamera gerekir. Yoksa kodu yazın.", "مسح رمز QR يحتاج كاميرا. بدونها الصق الرمز.", "扫二维码需要摄像头。没有的话粘贴代码。", "QRの読み取りにはカメラが必要です。カメラがなければコードを貼り付けてください。", "QR을 읽으려면 카메라가 필요합니다. 없으면 코드를 붙여넣으세요.", "QR स्कैन करने के लिए कैमरा चाहिए। नहीं है तो कोड चिपकाएँ", "Memindai QR memerlukan kamera. Jika tidak ada, ketik atau tempel kodenya.",
+          "Att skanna QR behövs kameran. Saknar den: klistra koden.", "QR:n lukemiseen tarvitaan kameraa. Muuten liitä koodi.", "Skenování QR vyžaduje kameru. Bez ní vložte kód.", "การสแกน QR ต้องใช้กล้อง ถ้าไม่มีกล้องให้พิมพ์หรือวางรหัส");
+        A("trCodeEmpty", "Paste or type the code first", "Primero pega o escribe el código", "Primeiro cole ou escreva o código", "Collez ou tapez d’abord le code", "Erst den Code einfügen", "Prima scrivi o incolla il codice", "Eerst de code plakken of typen", "Najpierw wklej lub wpisz kod",
+          "Сначала вставьте или введите код", "Önce kodu yapıştırın أو yazın", "الصق الرمز أو اكتبه أولا", "先粘贴或输入代码", "先にコードを貼り付けてください", "먼저 코드를 붙여넣거나 입력하세요", "पहले कोड चिपकाएँ या लिखें", "Tempel atau ketik kode terlebih dahulu",
+          "Klistra eller skriv koden först", "Liitä tai kirjoita koodi ensin", "Nejprve vložte nebo napište kód", "วางหรือพิมพ์รหัสก่อน");
+        A("trHotspot", "Turn on hotspot (no router needed)", "Encender hotspot (sin router)", "Ligar hotspot (sem router)", "Activer le partage de connexion", "Hotspot einschalten (ohne Router)", "Accendi l’hotspot (senza router)", "Hotspot aanzetten (geen router nodig)", "Włącz hotspot (bez routera)",
+          "Включить точку доступа", "Hotspot aç (yönlendirici gerekmez)", "تشغيل نقطة الاتصال", "开启热点（无需路由器）", "ホットスポットをオン（ルーター不要）", "핫스팟 켜기 (라우터 불필요)", "हॉटस्पॉट चालू करें (राउटर की ज़रूरत नहीं)", "Nyalakan hotspot (tanpa router)",
+          "Slå på hotspot (ingen router behövs)", "Ota hotspot käyttöön (ei reitintä)", "Zapnout hotspot (bez routeru)", "เปิดฮอตสปอต (ไม่ต้องใช้เราเตอร์)");
+        A("trHotspotAndroid", "On Android the hotspot is made from the quick settings of the system, so there is nothing to press here.", "En Android el hotspot se hace desde los ajustes rápidos del sistema, así que aquí no hay nada que pulsar.", "No Android o hotspot faz-se nos ajustes rápidos do sistema.", "Sur Android, le partage de connexion se fait depuis les réglages rapides.", "Unter Android wird der Hotspot über die Schnelleinstellungen gemacht.", "Su Android l’hotspot si fa dalle impostazioni rapide.", "Op Android maak je de hotspot via de snelleinstellingen.", "W Androidzie hotspot robi sie w szybkich ustawieniach.",
+          "В Android хотспот включается в быстрых настройках.", "Android’da hotspot hızlı ayarlardan açılır.", "في أندرويد يتم تشغيل نقطة الاتصال من الإعدادات السريعة.", "安卓的热点在系统快捷设置里开启。", "Androidではクイック設定からオンにします。", "안드로이드에서는 시스템 빠른 설정에서 켜면 됩니다.", "एंड्रॉइड में हॉटस्पॉट तेज़ सेटिंग से चालू होता है", "Di Android, hotspot diaktifkan lewat setelan cepat sistem, jadi tidak ada tombol di sini.",
+          "Op Android zet je de hotspot aan via de snelleinstellingen.", "Androidissa hotspot kytketään pika-asetuksista.", "V Androidu se hotspot zapne v rychlých nastaveních.", "บน Android เปิดฮอตสปอตได้จากการตั้งค่าด่วนของระบบ จึงไม่มีปุ่มให้กดที่นี่");
+        A("trOn", "On: the other device can connect", "Encendido: el otro equipo puede conectarse", "Ligado: o outro dispositivo pode ligar-se", "Allumé : l’autre appareil peut se connecter", "An: das andere Gerät kann sich verbinden", "Acceso: l’altro dispositivo può connettersi", "Aan: het andere apparaat kan verbinden", "Włączone: drugie urządzenie może się połączyć",
+          "Включено: другое устройство может подключиться", "Açık: diğer cihaz bağlanabilir", "مفعّل: يمكن للجهاز الآخر الاتصال", "已开启：对方可以连接", "オン：相手の端末が接続できます", "켜짐: 상대 기기가 연결할 수 있습니다", "चालू: दूसरा डिवाइस जुड़ सकता है", "Aktif: perangkat lain dapat terhubung",
+          "På: den andra enheten kan ansluta", "Päällä: toinen laite voi liittyä", "Zapnuto: druhé zařízení se může připojit", "เปิด: อุปกรณ์อื่นเชื่อมต่อได้");
+        A("trOff", "Off: turn it on to transfer", "Apagado: enciéndelo para transferir", "Desligado: ligue para transferir", "Éteint : activez-le pour transférer", "Aus: zum Transfer einschalten", "Spento: accendilo per trasferire", "Uit: zet aan om te transfereren", "Wyłączone: włącz, aby przesyłać",
+          "Выключено: включите для передачи", "Kapalı: açın ve aktarın", "مطفأ: شغّله للتحويل", "未开启：打开才能传输", "オフ：オンにすると転送できます", "꺼짐: 켜야 전송됩니다", "बंद: स्थानांतरण के लिए चालू करें", "Nonaktif: nyalakan dulu untuk mentransfer",
+          "Av: slå på för att skicka", "Päällä siirtoa varten", "Vypnuto: zapněte pro přenos", "ปิด: เปิดก่อนจึงจะโอนได้");
+        A("trMore", "More options", "Más opciones", "Mais opções", "Plus d’options", "Weitere Optionen", "Altre opzioni", "Meer opties", "Więcej opcji",
+          "Другие параметры", "Diğer seçenekler", "خيارات أخرى", "更多选项", "その他のオプション", "추가 옵션", "अन्य विकल्प", "Pilihan lainnya",
+          "Fler alternativ", "Lisää vaihtoehtoja", "Další možnosti", "ตัวเลือกอื่น");
+        A("trCodeBad", "That code is not a QBasWing address", "Ese código no es una dirección de QBasWing", "Esse código não é um endereço do QBasWing", "Ce code n’est pas une adresse QBasWing", "Dieser Code ist keine QBasWing-Adresse", "Questo codice non è un indirizzo QBasWing", "Deze code is geen QBasWing-adres", "Ten kod to nie adres QBasWing",
+          "Это не адрес QBasWing", "Bu kod bir QBasWing adresi değil", "هذا الرمز ليس عنوان QBasWing", "此代码不是 QBasWing 地址", "このコードは QBasWing のアドレスではありません", "이 코드는 QBasWing 주소가 아닙니다", "यह कोड QBasWing पता नहीं है", "Kode itu bukan alamat QBasWing",
+          "Koden är inte en QBasWing-adress", "Tämä koodi ei ole QBasWing-osoite", "Tento kód není adresa QBasWing", "รหัสนี้ไม่ใช่ที่อยู่ QBasWing");
+        A("trJoined", "Connected. Choose what to send.", "Conectado. Elige qué enviar.", "Ligado. Escolha o que enviar.", "Connecté. Choisissez ce que vous voulez envoyer.", "Verbunden. Wähle aus, was gesendet wird.", "Connesso. Scegli cosa inviare.", "Verbonden. Kies wat je wilt versturen.", "Połączono. Wybierz, co wysłać.",
+          "Подключено. Выберите, что отправить.", "Bağlandı. Ne göndereceğini seç.", "تم الاتصال. اختر ما تريد إرساله.", "已连接。选择要发送的内容。", "接続しました。送るものを選んでください。", "연결됨. 보낼 항목을 선택하세요.", "जुड़ गया। चुनें क्या भेजना है।", "Terhubung. Pilih yang akan dikirim.",
+          "Ansluten. Välj vad som ska skickas.", "Yhdistetty. Valitse lähetettävät.", "Připojeno. Vyberte, co poslat.", "เชื่อมต่องแล้ว เลือกสิ่งที่จะส่ง");
+        A("trNoAnswer", "Nothing answers at that address", "No responde en esa dirección", "Não responde nesse endereço", "Rien ne répond à cette adresse", "Unter dieser Adresse antwortet nichts", "Non risponde a quell’indirizzo", "Niets reageert op dat adres", "Nikt nie odpowiada pod tym adresem",
+          "По этому адресу никто не отвечает", "Bu adreste yanıt yok", "لا يوجد رد على هذا العنوان", "该地址没有响应", "そのアドレスからは応答がありません", "해당 주소에서 응답이 없습니다.", "इस पते पर कोई जवाब नहीं है", "Tidak ada yang merespons di alamat itu",
+          "Ingen svarar på den adressen", "Osoite ei vastaa", "Na této adrese nikdo neodpovídá", "ไม่มีการตอบสนุนดัวที่อยู่นี้");
+        A("trPaste", "Paste code", "Pegar código", "Colar código", "Coller le code", "Code einfügen", "Incolla codice", "Code plakken", "Wklej kod",
+          "Вставить код", "Kodu yapıştır", "لصق الرمز", "粘贴代码", "コードを貼り付け", "코드 붙여넣기", "कोड चिपकाएँ", "Tempel kode",
+          "Klistra in kod", "Liitä koodi", "Vložit kód", "วางรหัส");
+        A("trPasteFail", "There is nothing in the clipboard to paste", "No hay nada en el portapapeles", "Não há nada na área de transferência", "Rien dans le presse-papiers", "Die Zwischenablage ist leer", "Non c’è nulla negli appunti", "Het klembord is leeg", "Schowek jest pusty",
+          "В буфере обмена ничего нет", "Panoda yapıştılacak bir şey yok", "لا يوجد شيء في الحافظة", "剪贴板里没有内容", "クリップボードに内容がありません", "붙여넣을 내용이 없습니다.", "क्लिपबोर्ड में कुछ नहीं है", "Tidak ada isi di papan klip",
+          "Inget i urklipp att klistra in", "Leikepöydässä ei ole mitään", "Ve schránce nic není", "ไม่มีอะกราบสิ่งที่คลิปบอร์");
+        A("trSend", "Send", "Enviar", "Enviar", "Envoyer", "Senden", "Invia", "Versturen", "Wyślij",
+          "Отправить", "Gönder", "إرسال", "发送", "送信", "보내기", "भेजें", "Kirim",
+          "Skicka", "Lähetä", "Odeslat", "ส่ง");
+        A("trSel", "{0} selected · {1}", "{0} seleccionados · {1}", "{0} selecionados · {1}", "{0} sélectionnés · {1}", "{0} ausgewählt · {1}", "{0} selezionati · {1}", "{0} geselecteerd · {1}", "Zaznaczono: {0} · {1}",
+          "Выбрано: {0} · {1}", "{0} seçildi · {1}", "تم تحديد {0} · {1}", "已选 {0} 个 · {1}", "{0} 件を選択 · {1}", "{0}개 선택 · {1}", "{0} चयनित · {1}", "{0} dipilih · {1}",
+          "{0} valda · {1}", "Valittu {0} · {1}", "Vybráno: {0} · {1}", "เลือกแล้ว {0} · {1}");
+        A("catPhotos", "Photos", "Fotos", "Fotos", "Photos", "Fotos", "Foto", "Foto’s", "Zdjećcia",
+          "Фото", "Foto’lar", "صور", "照片", "写真", "사진", "फ़ोटो", "Foto",
+          "Foton", "Kuvat", "Fotografie", "รูปภาพ");
+        A("catVideos", "Videos", "Vídeos", "Vídeos", "Vidéos", "Videos", "Video", "Video’s", "Filmy",
+          "Видео", "Videolar", "فيديو", "视频", "動画", "동영상", "वीडियो", "Video",
+          "Videor", "Videot", "Videa", "วิดีโอ");
+        A("catMusic", "Music", "Música", "Música", "Musique", "Musik", "Musica", "Muziek", "Muzyka",
+          "Музыка", "Müzik", "موسيقي", "音乐", "音楽", "음악", "संगीत", "Musik",
+          "Musik", "Musiikki", "Hudba", "เพล");
+        A("catDocs", "Documents", "Documentos", "Documentos", "Documents", "Dokumente", "Documenti", "Documenten", "Dokumenty",
+          "Документы", "Belgeler", "مستندات", "文档", "文書", "문서", "दस्तावेज़", "Dokumen",
+          "Dokument", "Dokumentit", "Dokumenty", "เอกสาร");
+        A("catApps", "Installers", "Instaladores", "Instaladores", "Installateurs", "Installateure", "Installatori", "Installers", "Instalatory",
+          "Установщики", "Kurulum dosyaları", "مثبتات", "安装包", "インストーラー", "설치 파일", "इंस्टॉलर", "Pemasang",
+          "Installationsprogram", "Asentimet", "Instalátory", "ตัวติดตั้ง");
+        A("catOther", "Other", "Otros", "Outros", "Autres", "Sonstige", "Altri", "Overig", "Inne",
+          "Другое", "Diğer", "أخرى", "其他", "その他", "기타", "अन्य", "Lainnya",
+          "Övrigt", "Muut", "Ostatní", "อื่น");
+        A("sTransfer", "Transfer", "Transferir", "Transferir", "Transfert", "Übertragen", "Trasferisci", "Overdracht", "Transfer",
+          "Передача", "Aktarım", "النقل", "传输", "転送", "전송", "स्थानांतरण", "Transfer",
+          "Överföring", "Siirto", "Přenos", "การถ่ายโอน");
+        A("trInbox", "Where received files go", "Dónde se guardan los recibidos", "Onde ficam os recebidos", "Où vont les fichiers reçus", "Wohin empfangene Dateien kommen", "Dove finiscono i file ricevuti", "Waar ontvangen bestanden heen gaan", "Gdzie trafiają odebrane pliki",
+          "Куда попадают полученные файлы", "Alınan dosyalar nereye gider", "إلى أين تذهب الملفات المستلمة", "接收的文件放在哪里", "受信ファイルの保存先", "받는 파일이 저장되는 위치", "प्राप्त फ़ैलें कहां जाती हैं", "Tempat file yang diterima",
+          "Var mottagna filer hamnar", "Minne vastaanotetut tiedot menevät", "Kam se ukládají přijaté soubory", "ไฟล์ที่ได้รับจะถูกเก็บไว้ที่นี่");
+        A("trReset", "Reset", "Restablecer", "Repor", "Réinitialiser", "Zurücksetzen", "Ripristina", "Herstellen", "Przywróć",
+          "Сбросить", "Sıfırla", "إعادة تعيين", "重置", "リセット", "초기화", "रीसेट", "Atur ulang",
+          "Återställ", "Palauta", "Obnovit výchozí", "รีเซ็ต");
+        A("trPort", "Port", "Puerto", "Porta", "Port", "Port", "Porta", "Poort", "Port",
+          "Порт", "Bağlantı noktası", "المنفذ", "端口", "ポート", "포트", "पोर्ट", "Port",
+          "Port", "Portti", "Port", "พอร์ต");
+        A("trNotify", "Notify when a file arrives", "Avisar al recibir", "Avisar ao receber", "Prévenir à la réception", "Bei Empfang benachrichtigen", "Avvisa alla ricezione", "Melden bij ontvangst", "Powiadom przy odbiorze",
+          "Уведомлять при получении", "Dosya gelince bildir", "إشعار عند وصول ملف", "接收时提醒", "着信時に通知", "파일 도착 시 알림", "फ़ाइल आने पर सूचना", "Beri tahu saat menerima",
+          "Meddela vid mottagning", "Ilmoita vastaanotosta", "Upozornit při přijetí", "แจ้งเตือนเมื่อได้รับไฟล์");
+        A("trDevName", "Name of this device", "Nombre de este equipo", "Nome deste dispositivo", "Nom de cet appareil", "Name dieses Geräts", "Nome di questo dispositivo", "Naam van dit apparaat", "Nazwa tego urządzenia",
+          "Имя этого устройства", "Bu cihazın adı", "اسم هذا الجهاز", "本机名称", "この端末の名称", "이 기기 이름", "इस डिवाइस का नाम", "Nama perangkat ini",
+          "Enhetens namn", "Tämän laitteen nimi", "Název tohoto zařízení", "ชื่อเครื่อนี้");
         A("transfer", "Transfer", "Transferir", "Transferir", "Transférer", "Übertragen", "Trasferisci",
           "Overdragen", "Transferuj", "Передать", "Aktar", "نقل", "传输",
           "転送", "전송", "स्थानांतरण", "Transfer", "Överför", "Siirrä", "Přenos", "ถ่ายโอน");
@@ -746,5 +827,32 @@ public static class L
         A("oneMove", "Move this", "Mover este", "Mover este", "Déplacer celui-ci", "Diese verschieben", "Sposta questo",
           "Deze verplaatsen", "Przenieś ten", "Переместить этот", "Bunu taşı", "نقل هذا", "移动这个",
           "これを移動", "이것 이동", "इसे ले जाएँ", "Pindahkan ini", "Flytta den här", "Siirrä tämä", "Přesunout tento", "ย้ายรายการนี้");
+        A("trSort", "Sort what arrives into folders by type", "Ordenar lo recibido en carpetas por tipo", "Organizar o que chega em pastas por tipo", "Classer ce qui arrive dans des dossiers par type", "Empfangenes nach Typ in Ordner sortieren", "Ordina ciò che arriva in cartelle per tipo", "Sorteer wat binnenkomt in mappen per soort", "Sortuj przychodzące pliki w foldery według typu",
+          "Сортировать полученное по папкам и типу", "Gelenenleri türüne göre klasörlere ayır", "ترتيب الملفات الواردة في مجلدات حسب النوع", "按类型将收到的文件分到不同文件夹", "受信ファイルを種類別のフォルダに整理", "받는 파일을 종볌별 폴더로 정리", "आने वाली फ़ैलों को प्रकार के अनुसार फ़ोल्डर में", "Kelompokkan yang masuk ke folder menurut jenis",
+          "Sortera in i mappar efter typ", "Jaa saapuneet kansioihin tyypin mukaan", "Řadit přijaté soubory do složek podle typu", "จัดเก็บไฟล์ที่ได้รับเป็นโฟลเดอร์ตามชนิด");
+        A("volDownloads", "Downloads", "Descargas", "Transferências", "Téléchargements", "Downloads", "Download", "Downloads", "Pobrane",
+          "Загрузки", "İndirilenler", "التنزيلات", "下载", "ダウンロード", "다운로드", "डाउनलोड", "Unduhan",
+          "Nedladdningar", "Lataukset", "Stažení", "ดาวน์โหลด");
+        A("volStorage", "Phone storage", "Almacenamiento del móvil", "Armazenamento do telemóvel", "Stockage du téléphone", "Telefonspeicher", "Archiviazione del telefono", "Telefoonopslag", "Pamięć telefonu",
+          "Память телефона", "Telefon belleği", "ذاكرة الهاتف", "手机存储", "端末のストレージ", "기기 저장소", "फ़ोन स्टोरेज", "Penyimpanan ponsel",
+          "Telefonlagring", "Puhelimen tallennus", "Úložiště telefonu", "พื้นที่โทรศัพท์");
+        A("volSdUsb", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB",
+          "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB", "SD / USB",
+          "SD / USB", "SD / USB", "SD / USB", "SD / USB");
+        A("trAskFolder", "Where do you want received files to go?", "¿Dónde quieres que se guarden los archivos que te envíen?", "Onde queres que fiquem os ficheiros enviados?", "Où voulez-vous enregistrer les fichiers reçus ?", "Wohin sollen empfangene Dateien gespeichert werden?", "Dove vuoi salvare i file ricevuti?", "Waar wil je ontvangen bestanden opslaan?", "Gdzie zapisywać otrzymane pliki?",
+          "Куда сохранять полученные файлы?", "Alınan dosyalar nereye kaydedilsin?", "أين تريد حفظ الملفات الواردة؟", "收到的文件要保存在哪里？", "受け取ったファイルをどこに保存しますか？", "받은 파일을 어디에 저장할까요?", "प्राप्त फ़ाइलें कहाँ सहेजनी हैं?", "Di mana file yang diterima disimpan?",
+          "Var vill du spara mottagna filer?", "Minne haluat tallentaa vastaanotetut tiedot?", "Kam uložit přijaté soubory?", "ต้องการเก็บไฟล์ที่ได้รับไว้ที่ใด");
+        A("trSendFolder", "Send folder…", "Enviar carpeta…", "Enviar pasta…", "Envoyer un dossier…", "Ordner senden…", "Invia cartella…", "Map versturen…", "Wyślij folder…",
+          "Отправить папку…", "Klasör gönder…", "إرسال مجلد…", "发送文件夹…", "フォルダーを送信…", "폴더 보내기…", "फ़ोल्डर भेजें…", "Kirim folder…",
+          "Skicka mapp…", "Lähetä kansio…", "Odeslat složku…", "ส่งโฟลเดอร์…");
+        A("trSelDirs", "Select {0} files · {1} folders", "Seleccionar {0} archivos · {1} carpetas", "Selecionar {0} ficheiros · {1} pastas", "Sélectionner {0} fichiers · {1} dossiers", "{0} Dateien · {1} Ordner auswählen", "Seleziona {0} file · {1} cartelle", "{0} bestanden · {1} mappen selecteren", "Wybierz {0} plików · {1} folderów",
+          "Выбрать {0} файлов · {1} папок", "{0} dosya · {1} klasör seç", "اختر {0} ملفًا · {1} مجلدًا", "选择 {0} 个文件 · {1} 个文件夹", "{0} 個のファイル · {1} 個のフォルダーを選択", "파일 {0}개 · 폴더 {1}개 선택", "{0} फ़ाइलें · {1} फ़ोल्डर चुनें", "Pilih {0} file · {1} folder",
+          "Välj {0} filer · {1} mappar", "Valitse {0} tiedostoa · {1} kansiota", "Vybrat {0} souborů · {1} složek", "เลือก {0} ไฟล์ · {1} โฟลเดอร์");
+        A("refresh", "Refresh", "Actualizar", "Atualizar", "Actualiser", "Aktualisieren", "Aggiorna", "Vernieuwen", "Odśwież",
+          "Обновить", "Yenile", "تحديث", "刷新", "更新", "새로 고침", "रिफ्रेश", "Segarkan",
+          "Uppdatera", "Päivitä", "Obnovit", "รีเฟรช");
+        A("trDropHint", "You can also drop files or folders here", "También puedes soltar aquí archivos o carpetas", "Também pode largar aqui ficheiros ou pastas", "Vous pouvez aussi déposer ici des fichiers ou des dossiers", "Dateien oder Ordner kann man hier auch ablegen", "Qui puoi trascinare qui file o cartelle", "Je kunt hier ook bestanden of mappen neerzetten", "Możesz też upuścić tu pliki lub foldery",
+          "Можно перетащить сюда файлы или папки", "Dosyaları veya klasörleri buraya da sürükleyebilirsin", "يمكنك أيضًا إسقاط الملفات أو المجلدات هنا", "也可以把文件或文件夹拖到这里", "ファイルやフォルダーをここにドラッグできます", "여기에 파일이나 폴더를 끌어다 놓을 수 있습니다", "यहाँ फ़ाइलें या फ़ोल्डर छोड़े जा सकते हैं", "Anda juga boleh seret berkas atau folder ke sini",
+          "Du kan också släppa filer eller mappar här", "Voit pudottaa tähän tiedostoja tai kansioita", "Sem můžete přetáhnout soubory či složky", "คุณสามารถลากไฟล์หรือโฟลเดอร์มาวางที่นี่ได้");
     }
 }

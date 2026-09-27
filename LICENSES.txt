@@ -14,11 +14,11 @@ MÚSICA DEL INSTALADOR (Windows)
   Fuente: https://freepd.com/ (CC0 / dominio público). Sin atribución requerida.
   Archivo: QBasCopierSetup/Assets/music.mp3
 
-INSPIRACIÓN
-  El comportamiento (colas, reproducción, límite de velocidad, reintentos…) está
-  inspirado en copiadores existentes, pero la implementación, interfaz, textos,
-  paleta y organización son originales de este proyecto. No incluye código de
-  SuperCopier ni de terceros.
+ORIGINALIDAD
+  Todo el código, la interfaz, los textos, la paleta y la organización son
+  originales de este proyecto. No incluye código de terceros ni de ninguna otra
+  aplicación. Las únicas dependencias externas son los paquetes NuGet listados
+  abajo, con su licencia.
 
 TERCEROS (paquetes NuGet)
   - Avalonia UI 11.3.5 (MIT) — https://github.com/AvaloniaUI/Avalonia

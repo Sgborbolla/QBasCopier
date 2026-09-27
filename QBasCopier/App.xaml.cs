@@ -28,7 +28,7 @@ public partial class App : Application
                 CrashLog.Info("DesktopWindow created");
                 w.Closed += (_, _) => desktop.Shutdown();
                 desktop.MainWindow = w;
-                w.Content.As<MainWindow>()?.InitialBoot();
+                (w.Content as MainWindow)?.InitialBoot();
                 CrashLog.Info("InitialBoot done");
             }
 #else

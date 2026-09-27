@@ -257,6 +257,121 @@ public static class DroidDir
         }
         catch { return false; }
     }
+
+    /// <summary>
+    /// Recorre un arbol SAF entero y devuelve sus archivos (ruta relativa dentro de
+    /// la carpeta, tamano y fecha) y las carpetas vacias. El recorrido es a
+    /// velocidad de red pero en memoria solo hay la lista, asi que una carpeta de
+    /// 50.000 archivos se aguanta; con 5 millones habria que ir por partes, que es
+    /// justo lo que haria falta para un telefono de 256 GB lleno.
+    /// </summary>
+    public static (List<(string Rel, string Uri, long Size, DateTime Modified)> Files,
+                    List<string> EmptyDirs, string Error) Walk(string treeUri)
+    {
+        var ficheros = new List<(string, string, long, DateTime)>();
+        var vacias = new List<string>();
+        var cola = new Queue<(string Uri, string Rel, int Depth)>();
+        cola.Enqueue((Root(treeUri), "", 0));
+        try
+        {
+            while (cola.Count > 0)
+            {
+                var (dir, rel, depth) = cola.Dequeue();
+                if (depth > 64) continue; // en un arbol ciclico no se entra mas
+                var hijos = Children(dir);
+                var tiene = false;
+                foreach (var h in hijos)
+                {
+                    var r = rel.Length == 0 ? h.Name : rel + "/" + h.Name;
+                    if (h.IsDir) cola.Enqueue((h.Uri, r, depth + 1));
+                    else
+                    {
+                        tiene = true;
+                        var info = DroidFile.Info(h.Uri);
+                        ficheros.Add((r, h.Uri, h.Size > 0 ? h.Size : (info?.Item2 ?? 0), info?.Item3 ?? DateTime.Now));
+                    }
+                }
+                // Carpeta sin archivos dentro: se manda igualmente para que el otro
+                // la tenga tal cual estaba, no se pierde por el camino.
+                if (!tiene && depth > 0) vacias.Add(rel);
+            }
+            return (ficheros, vacias, "");
+        }
+        catch (Exception e)
+        {
+            QBasCopier.CrashLog.Info("recorrer carpeta SAF: " + e.Message);
+            return (ficheros, vacias, "no-leible");
+        }
+    }
+
+    /// <summary>
+    /// Los sitios donde se puede elegir donde recibir: Descargas, el
+    /// almacenamiento externo y, si el movil tiene, la SD o un USB. Se ofrecen
+    /// como destino y no solo "Descargas", porque el usuario puede tener medio
+    /// movil en la SD y ahi es donde quiere recibir.
+    ///
+    /// Son candidatos: al elegir uno, Android pide el permiso una vez (es
+    /// inevitable, desde Android 11 no se puede escribir ahi sin el). Si un
+    /// volumen no se deja(listar SD con uuid es cosa del sistema), no aparece y
+    /// el usuario lo elige con "Elegir carpeta...", que si llega a todo.
+    /// </summary>
+    public static List<(string Nombre, string Uri)> Volumes()
+    {
+        var res = new List<(string, string)>();
+        try
+        {
+            var ext = global::Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "";
+            var montada = ext.Length > 3 && System.IO.Directory.Exists(ext);
+            if (montada)
+            {
+                res.Add((QBasCopier.L.Get("volDownloads"), Doc("primary:Download")));
+                res.Add((QBasCopier.L.Get("volStorage"), Doc("primary:")));
+            }
+
+            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as StorageManager;
+            var vols = sm?.Volumes;
+            if (vols != null)
+                foreach (var v in vols)
+                {
+                    if (v == null) continue;
+                    if (v.State != VolumeState.Mounted && v.State != VolumeState.MountedReadOnly) continue;
+                    string ruta = "";
+                    try { ruta = v.GetPath() ?? ""; } catch { continue; }
+                    ruta = ruta.TrimEnd('/');
+                    if (ruta.Length == 0) continue;
+                    // El almacenamiento principal ya esta en la lista de arriba.
+                    if (montada && string.Equals(ruta, ext.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)) continue;
+                    var etiqueta = ruta;
+                    try { etiqueta = v.GetDescription() ?? ruta; } catch { }
+                    if (string.IsNullOrWhiteSpace(etiqueta) || etiqueta == ruta)
+                    {
+                        var sd = ruta.Substring(ruta.LastIndexOf('/') + 1);
+                        etiqueta = string.IsNullOrEmpty(sd) ? QBasCopier.L.Get("volSdUsb") : sd;
+                    }
+                    res.Add((etiqueta, ruta));
+                }
+        }
+        catch (Exception e) { QBasCopier.CrashLog.Info("listar volumenes: " + e.Message); }
+        return res;
+    }
+
+    /// <summary>
+    /// La carpeta de Descargas del movil. Es el sitio donde se espera que caiga lo
+    /// que nos mandan, y el que se propone por defecto en el selector de carpetas.
+    /// </summary>
+    public static string Downloads() => Doc("primary:Download");
+
+    /// <summary>URI de un documento del almacenamiento externo ("primary:Download").</summary>
+    private static string Doc(string docId)
+    {
+        try
+        {
+            var u = global::Android.Provider.DocumentsContract.BuildDocumentUri("com.android.externalstorage.documents", docId);
+            return u?.ToString() ?? "";
+        }
+        catch { return ""; }
+    }
+
 }
 
 public static class DroidList
@@ -513,6 +628,10 @@ public class MainActivity : AvaloniaMainActivity<App>
         QBasCopier.TransferHost.DocInfo = DroidFile.Info;
         QBasCopier.TransferHost.ListDoc = DroidList.Children;
         QBasCopier.TransferHost.WriteDoc = DroidDir.OpenForWrite;
+        // La carpeta de marca con sus subcarpetas por tipo: en Android 11+ la unica
+        // forma de crearlas es con permisos SAF, asi que se le pasa el arbol.
+        QBasCopier.TransferHost.EnsureDocDir = DroidDir.EnsurePath;
+        QBasCopier.TransferHost.DocExists = DroidDir.FileExistsIn;
         base.OnCreate(savedInstanceState);
     }
 
@@ -599,14 +718,32 @@ public class MainActivity : AvaloniaMainActivity<App>
     }
 
     public Action<string>? TreeCb;
+    /// <summary>Sitio donde se abre el selector de carpetas (vacío = raíz).</summary>
+    public string TreeStart = "";
 
-    public void PickTree(Action<string> done)
+    public void PickTree(Action<string> done) => PickTreeAt("", done);
+
+    /// <summary>
+    /// Selector de carpetas del sistema. Con <paramref name="inicio"/> se abre ya
+    /// en ese sitio, que es como se elige "Descargas" o la SD sin tener que
+    /// recorrer el arbol a mano.
+    /// </summary>
+    public void PickTreeAt(string inicio, Action<string> done)
     {
         TreeCb = done;
+        TreeStart = inicio ?? "";
         RunOnUiThread(() =>
         {
-            try { StartActivityForResult(new Intent(Intent.ActionOpenDocumentTree), ReqTree); }
-            catch { TreeCb?.Invoke(""); }
+            try
+            {
+                var it = new Intent(Intent.ActionOpenDocumentTree);
+                if (TreeStart.Length > 0)
+                {
+                    try { it.PutExtra("android.provider.extra.INITIAL_URI", global::Android.Net.Uri.Parse(TreeStart)); } catch { }
+                }
+                StartActivityForResult(it, ReqTree);
+            }
+            catch { var cb0 = TreeCb; TreeCb = null; cb0?.Invoke(""); }
         });
     }
 

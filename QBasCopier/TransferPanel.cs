@@ -6,7 +6,7 @@ using Avalonia.Media;
 namespace QBasCopier;
 
 /// <summary>
-/// La ventanita de Transferir, al estilo de la de Zapya.
+/// El panel de Transferir: la pantalla principal de la app.
 ///
 /// Cuando la ventana principal esta minimizada en la bandeja y eliges
 /// Transferir, lo que tiene que salir es esto: una ventana pequena e
@@ -51,6 +51,8 @@ public sealed class TransferPanel : UserControl
     public event Action<string>? JoinWithCode;
     /// <summary>Enciende un hotspot para no depender del router (solo Windows).</summary>
     public event Action? CreateHotspot;
+    /// <summary>Abre el buscador de archivos para mandarle cosas a ese equipo.</summary>
+    public event Action? PickFiles;
 
     public TransferPanel(string deviceName)
     {
@@ -127,12 +129,46 @@ public sealed class TransferPanel : UserControl
 
         _joinHint = Note(L.Get("trJoinHint"));
 
-        _joinCard = Card(L.Get("trJoinTitle"), "link", new Control[]
+        // Elegir y enviar. En el PC esto abre el buscador de la propia app (se
+        // ven las carpetas, se eligen varias cosas y se sueltan encima); en movil
+        // abre el selector del sistema, que ya sabe filtrar por tipo.
+        var pick = Big(L.Get("addFiles"), () => PickFiles?.Invoke(), TextSoft);
+
+        var joinBody = new List<Control> { _code };
+#if !ANDROID
+        // En el PC no hay camara, y escribir una direccion a mano es un coñazo:
+        // el codigo llega copiado desde el otro equipo y se pega de un clic.
+        var paste = new Button
         {
-            _code,
-            joinBtn,
-            _joinHint
-        });
+            Content = new TextBlock { Text = L.Get("trPaste"), FontSize = 12.5, Foreground = TextSoft },
+            Background = BgCard,
+            BorderBrush = Line,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            MinHeight = 36,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        paste.Click += async (_, _) =>
+        {
+            try
+            {
+                var clip = TopLevel.GetTopLevel(this)?.Clipboard;
+                if (clip == null) { _joinHint.Text = L.Get("trPasteFail"); return; }
+                var t = await clip.GetTextAsync();
+                if (string.IsNullOrWhiteSpace(t)) { _joinHint.Text = L.Get("trPasteFail"); return; }
+                _code.Text = t.Trim();
+                _joinHint.Text = L.Get("trJoinHint");
+            }
+            catch { _joinHint.Text = L.Get("trPasteFail"); }
+        };
+        joinBody.Add(paste);
+#endif
+        joinBody.Add(joinBtn);
+        joinBody.Add(pick);
+        joinBody.Add(_joinHint);
+
+        _joinCard = Card(L.Get("trJoinTitle"), "link", joinBody.ToArray());
 
         var head = new StackPanel
         {
@@ -152,8 +188,8 @@ public sealed class TransferPanel : UserControl
             }
         };
 
-        // En un movil se apilan; en PC caben en dos columnas. Como Zapya: lo
-        // importante esta arriba, sin hacer scroll.
+        // En un movil se apilan y en PC caben en dos columnas: lo importante
+        // esta arriba, sin tener que hacer scroll.
         var cards = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 300 };
         _createCard.Width = 290;
         _joinCard.Width = 290;
@@ -194,6 +230,19 @@ public sealed class TransferPanel : UserControl
     public void SetJoinHint(string msg) => _joinHint.Text = msg;
 
     public void PrefillCode(string code) => _code.Text = code;
+
+    /// <summary>
+    /// Deja marcada la tarjeta a la que se refiere una accion del menu (crear o
+    /// unirse), para que se sepa de que botón se ha pulsado en la bandeja.
+    /// </summary>
+    public void FocusCard(string which)
+    {
+        var crear = which == "crear";
+        _createCard.BorderThickness = new Thickness(crear ? 2 : 1);
+        _joinCard.BorderThickness = new Thickness(crear ? 1 : 2);
+        _createCard.BorderBrush = crear ? Gold : Line;
+        _joinCard.BorderBrush = crear ? Line : Gold;
+    }
 
     private static TextBlock Note(string t) => new()
     {

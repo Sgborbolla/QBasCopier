@@ -733,8 +733,13 @@ public sealed class CopyEngine
         {
             try
             {
-                var acl = File.GetAccessControl(it.SourcePath);
-                File.SetAccessControl(it.DestPath, acl);
+                // En .NET moderno esto vive en FileInfo, no en File. Solo tiene
+                // sentido en Windows: en Linux y macOS no hay ACL que copiar y la
+                // excepcion del catch lo deja pasar sin drama.
+                var origen = new FileInfo(it.SourcePath);
+                var destino = new FileInfo(it.DestPath);
+                var acl = origen.GetAccessControl();
+                destino.SetAccessControl(acl);
             }
             catch { }
         }

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Platform;
 
+using Avalonia.Layout;
 namespace QBasCopier;
 
 /// <summary>
@@ -108,10 +109,10 @@ public static class Ico
                 foreach (var p in polys)
                 {
                     if (p.Length < 4) continue;
-                    ctx.BeginFigure(new Point(p[0], p[1]), isFilled: false, isClosed: false);
+                    ctx.BeginFigure(new Point(p[0], p[1]), isFilled: false);
                     for (int i = 2; i + 1 < p.Length; i += 2)
                         ctx.LineTo(new Point(p[i], p[i + 1]));
-                    ctx.EndFigure(closeFigure: false);
+                    ctx.EndFigure(false);
                 }
             }
             if (Circles.TryGetValue(name, out var circles))
@@ -122,10 +123,10 @@ public static class Ico
                     var cx = c[0];
                     var cy = c[1];
                     var r = c[2];
-                    ctx.BeginFigure(new Point(cx - r, cy), isFilled: false, isClosed: true);
+                    ctx.BeginFigure(new Point(cx - r, cy), isFilled: false);
                     ctx.ArcTo(new Point(cx + r, cy), new Size(r, r), 0, isLargeArc: false, sweepDirection: SweepDirection.Clockwise);
                     ctx.ArcTo(new Point(cx - r, cy), new Size(r, r), 0, isLargeArc: false, sweepDirection: SweepDirection.Clockwise);
-                    ctx.EndFigure(closeFigure: true);
+                    ctx.EndFigure(true);
                 }
             }
         }

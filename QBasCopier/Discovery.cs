@@ -21,7 +21,8 @@ public static class Discovery
     private static readonly Dictionary<string, long> _seen = new();
     private static readonly Dictionary<string, long> _repliedTo = new();
 
-    // puertos en los que también escuchamos para convivir con Zapya/SHAREit/Xender
+    // puertos en los que tambien escuchamos para convivir con otras apps de
+    // transferencia que ya usan la red
     private static readonly int[] Ports = { TransferHost.DiscoveryPort, TransferHost.LegacyDiscoveryPort };
 
     public static void Start(string myName, int port)
@@ -69,7 +70,7 @@ public static class Discovery
         catch { return null; }
     }
 
-    // permite que la app y Zapya convivan en el mismo puerto (SO_REUSEPORT en Linux/Android)
+    // permite que varias apps convivan en el mismo puerto (SO_REUSEPORT en Linux/Android)
     private static void ReusePort(UdpClient u)
     {
         try { u.Client.SetSocketOption(SocketOptionLevel.Socket, (SocketOptionName)15, true); } catch { }
@@ -119,7 +120,7 @@ public static class Discovery
                     continue;
                 }
 
-                // Sondeo de otra app (Zapya/SHAREit/Xender u otra QBasCopier): respondemos con nuestra
+                // Sondeo de otra app de transferencia: respondemos con nuestra
                 // firma para que nos vean en la misma red, sin exigir su formato binario.
                 if (ShouldReply(fromIp))
                 {

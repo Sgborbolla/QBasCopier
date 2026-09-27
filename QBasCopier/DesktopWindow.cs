@@ -26,7 +26,8 @@ public sealed class DesktopWindow : Window
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        // minimizar a la bandeja, como SuperCopier / TeraCopy / NovaCopy
+        // Al cerrar, en vez de matar la app, se retira a la bandeja: es lo que
+        // espera cualquiera que la deje copiando algo en segundo plano.
         var view = Content as MainWindow;
         if (view != null && !view.ForceClose && MainWindow.S.MinimizeTo == "tray" && view.TrayVisible)
         {

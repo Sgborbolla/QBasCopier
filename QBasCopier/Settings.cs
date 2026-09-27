@@ -36,7 +36,7 @@ public sealed class Settings
     public int ThrottleMs { get; set; } = 100;
     public string Priority { get; set; } = "normal";
 
-    // SuperCopier-style options
+    // Opciones de comportamiento
     public bool ActivateOnStart { get; set; } = true;
     public string SizeUnit { get; set; } = "";
     public string AddListsWhen { get; set; } = "always";
@@ -53,6 +53,18 @@ public sealed class Settings
     public string TransferKey { get; set; } = "QBas2026";
     public string TransferInbox { get; set; } = "";
     public bool TransferAuto { get; set; }
+    /// <summary>
+    /// Ordena lo recibido en subcarpetas por tipo (Fotos, Videos, Musica...). Es lo
+    /// que hacen las apps de este estilo; se puede apagar para que todo caiga en la
+    /// raiz de la carpeta elegida.
+    /// </summary>
+    public bool TransferSort { get; set; } = true;
+
+    /// <summary>
+    /// Ya se le pregunto al usuario donde receiving. En el movil esa pregunta es
+    /// necesaria la primera vez (permiso de Android) y no se repite luego.
+    /// </summary>
+    public bool TransferInboxAsked { get; set; }
     public string DeviceName { get; set; } = "";
 
     /// <summary>

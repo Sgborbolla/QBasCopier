@@ -67,7 +67,7 @@ public sealed partial class MainWindow : UserControl
     private WrapPanel _cmdBar = null!;
     private StackPanel _oneBar = null!;
     private Border _oneBox = null!;
-    private TextBlock _oneLbl = null!;    private ComboBox _cmbLang = null!, _cmbLangQuick = null!, _cmbAfter = null!, _cmbEngine = null!, _cmbCollision = null!, _cmbError = null!, _cmbPriority = null!, _cmbBuffer = null!, _cmbSizeUnit = null!, _cmbAddWhen = null!;
+    private TextBlock _oneLbl = null!;    private ComboBox _cmbLang = null!, _cmbLangQuick = null!, _cmbAfter = null!, _cmbEngine = null!, _cmbCollision = null!, _cmbError = null!, _cmbPriority = null!, _cmbBuffer = null!, _cmbSizeUnit = null!, _cmbAddWhen = null!, _cmbVolume = null!;
     private TextBox _tbBuffer = null!, _tbRetry = null!, _tbSpeed = null!, _tbUpdate = null!, _tbAvg = null!, _tbThrottle = null!, _tbWarn = null!, _tbNewPat = null!;
     private Slider _sldThreads = null!, _sldSpeed = null!;
     private TextBlock _lblThreads = null!, _lblSpeed = null!;
@@ -111,6 +111,14 @@ public sealed partial class MainWindow : UserControl
     private TextBlock? _trRx;
     private TextBox? _trAddr;
     private ListBox? _trPeers;
+    private TextBlock? _trInboxLbl;
+    private TransferPanel? _trPanel;
+    /// <summary>Equipo al que estamos unidos, para el boton de elegir archivos.</summary>
+    private string _trPeerUrl = "";
+#if !ANDROID
+    private TransferPopup? _trPopup;
+#endif
+    private bool _askingInbox;
     private readonly System.Collections.Generic.List<string> _trPeerList = new();
     private long _trRxBytes;
     private long _trLastFill;
@@ -187,10 +195,29 @@ public sealed partial class MainWindow : UserControl
     {
         if (on)
         {
+            // En Android la primera vez se pregunta donde receiving: desde Android 11
+            // no se puede escribir en Descargas sin que el usuario de permiso una vez
+            // sobre esa carpeta. Si lo dice que no, se recibe en la carpeta privada de
+            // la app, que siempre funciona.
+#if ANDROID
+            if (string.IsNullOrWhiteSpace(S.TransferInbox) && !S.TransferInboxAsked)
+            {
+                S.TransferInboxAsked = true;
+                S.Save();
+                S.TransferOn = false;
+                AskInboxFirstTime();
+                return;
+            }
+#endif
             var inbox = S.TransferInbox;
             if (string.IsNullOrWhiteSpace(inbox)) inbox = TransferDefaultInbox();
             S.TransferInbox = inbox;
+            TransferHost.SortByType = S.TransferSort;
             if (!CopyEngine.IsSafPath(inbox)) { try { Directory.CreateDirectory(inbox); } catch { } }
+            // La carpeta de la marca con sus subcarpetas por tipo, listas antes de que
+            // llegue el primer archivo: el usuario ve donde va a caer cada cosa.
+            if (!TransferHost.PrepareInbox(inbox))
+                CrashLog.Info("subcarpetas por tipo no creadas en: " + inbox);
             _trSrv.Start(S.TransferPort, inbox);
             Discovery.Start(DevName, S.TransferPort);
             _lblStatus.Text = "Modo Transferir activado. Muestra el QR o busca dispositivos.";
@@ -217,20 +244,29 @@ public sealed partial class MainWindow : UserControl
     {
         try
         {
-            if (OperatingSystem.IsAndroid())
+#if ANDROID
+            // En el movil lo normal es Descargas con permiso; esta carpeta privada es
+            // el plan B para cuando el usuario no da permiso: siempre se puede
+            // escribir ahi, y no se le pide nada.
+            try
             {
-                // SpecialFolder.ApplicationData en Android no es una ruta escribible de
-                // verdad: al recibir, la escritura fallaba y no se guardaba nada.
-                try
-                {
-                    var home = QBasCopier.Android.DroidList.Home();
-                    var dir = System.IO.Path.Combine(home, "Recibidos");
-                    Directory.CreateDirectory(dir);
-                    return dir;
-                }
-                catch { }
+                var home = QBasCopier.Android.DroidList.Home();
+                var dir = System.IO.Path.Combine(home, AppName);
+                Directory.CreateDirectory(dir);
+                return dir;
             }
-            return System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "QBasCopierRecibidos");
+            catch { }
+#endif
+            // En el PC va donde el usuario ya busca descargas: Documentos en Windows
+            // y Linux, Descargas en macOS, que es donde el sistema las deja.
+            // Sin limites de tamano: aqui cae un video de 20 GB igual que una foto.
+            var baseDir = OperatingSystem.IsMacOS()
+                ? System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            if (string.IsNullOrEmpty(baseDir)) baseDir = System.IO.Path.GetTempPath();
+            var final = System.IO.Path.Combine(baseDir, AppName);
+            try { Directory.CreateDirectory(final); } catch { }
+            return final;
         }
         catch { return System.IO.Path.GetTempPath(); }
     }
@@ -238,25 +274,68 @@ public sealed partial class MainWindow : UserControl
     private Control BuildTransferBody()
     {
         InitTransfer();
-        var sp = new StackPanel { Spacing = 10, Margin = new Thickness(6) };
+
+        // ---- El panel de Transferir, arriba de todo ---------------------------
+        // Las dos mitades de una transferencia: enseñar mi QR para que el otro
+        // equipo me mande archivos, o escribir su codigo para mandarle yo. En PC
+        // las dos tarjetas caben en dos columnas y en movil se apilan. El resto
+        // de herramientas queda debajo, plegado, para que no estorben.
+        _trPanel = new TransferPanel(DevName);
+        _trPanel.ToggleTransfer += on => ToggleTr(on);
+        _trPanel.CreateHotspot += () => { OpenHotspot(); TrSyncPanel(); };
+        _trPanel.JoinWithCode += code => TrJoinCode(code, _trPanel);
+        _trPanel.PickFiles += () => TrPickForPeer();
+
+        var det = new Expander
+        {
+            Header = L.Get("trMore"),
+            IsExpanded = false,
+            Margin = new Thickness(0, 6, 0, 0),
+            Foreground = TextSoft
+        };
+        _texts.Add(("trMore", () => { try { det.Header = L.Get("trMore"); } catch { } }));
+        det.Content = BuildTransferAdvanced();
+
+        TrSyncPanel();
+        return new ScrollViewer
+        {
+            Content = new StackPanel
+            {
+                Spacing = 6,
+                Margin = new Thickness(6),
+                Children = { _trPanel, det }
+            },
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
+        };
+    }
+
+    /// <summary>
+    /// Las herramientas de siempre de Transferir: red propia, escaner, direccion a
+    /// mano y dispositivos encontrados. Se quedan todas, pero plegadas: lo de
+    /// arriba ya cubre el caso normal y esto es para cuando hay que afinar.
+    /// </summary>
+    private Control BuildTransferAdvanced()
+    {
+        var sp = new StackPanel { Spacing = 10 };
 
         var head = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         _trToggle = MkChk("Modo Transferir (compartir por WiFi)", S.TransferOn, b => ToggleTr(b));
         head.Children.Add(_trToggle);
         head.Children.Add(Btn("Crear nuestra red", OpenHotspot));
+#if ANDROID
+        // El escaner usa la camara, que en el PC no existe: ahi se usa el codigo
+        // escrito o pegado en la tarjeta de Unirse.
         head.Children.Add(Btn("Escanear QR", ScanQr));
+#endif
         head.Children.Add(Btn("Buscar dispositivos", () => { Discovery.Announce(); FillPeers(); _lblStatus.Text = "Buscando dispositivos…"; }));
         sp.Children.Add(head);
 
         var cfg = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var nmLb = MkLbl("Mi nombre:", 12); nmLb.Tint(TextSoft);
-        cfg.Children.Add(nmLb);
-        var tbName = new TextBox { Text = S.DeviceName ?? "", Width = 180, Watermark = "android · PC · tablet" };
-        tbName.TextChanged += (s, e) => { S.DeviceName = tbName?.Text ?? ""; S.Save(); };
-        cfg.Children.Add(tbName);
         cfg.Children.Add(Btn("Carpeta de recibidos…", PickInbox));
-        var chkAuto = MkChk("Avisar al recibir", S.TransferAuto, b => { S.TransferAuto = b; S.Save(); });
-        cfg.Children.Add(chkAuto);
+        var lblIn = MkLbl("", 12); lblIn.Tint(TextSoft); lblIn.TextWrapping = TextWrapping.Wrap; lblIn.MaxWidth = 420;
+        lblIn.Text = S.TransferInbox;
+        _trInboxLbl = lblIn;
+        cfg.Children.Add(lblIn);
         sp.Children.Add(cfg);
 
         var row = new Grid { ColumnDefinitions = { new(GridLength.Auto), new(GridLength.Star) } };
@@ -324,6 +403,159 @@ public sealed partial class MainWindow : UserControl
         return sp;
     }
 
+    // ---- Puente con el panel de Transferir -----------------------------------
+    //
+    // El panel (pestaña) y la ventanita de la bandeja tienen que contar lo mismo
+    // que el servidor, no lo que uno se supone. Todo lo que enciende o apaga algo
+    // pasa por aqui para que ninguna de las dos se quede enseñando una cosa que
+    // ya no es cierta.
+
+    /// <summary>Pon el panel al día con el estado real del servidor.</summary>
+    internal void TrSyncPanel(TransferPanel? panel = null)
+    {
+        var p = panel ?? _trPanel;
+        if (p == null) return;
+        var on = _trSrv.Running;
+        var url = "";
+        if (on)
+            foreach (var pref in _trSrv.Prefixes)
+                if (!pref.Contains("127.0.0.1")) { url = pref.TrimEnd('/'); break; }
+        p.SetRunning(on, url, "");
+        if (on) p.SetQr(MakeQrText());
+    }
+
+#if !ANDROID
+    /// <summary>
+    /// Abre la ventana principal en la pestaña de Transferir. Lo usa la ventanita de
+    /// la bandeja para lo que no cabe en dos tarjetas (destino, puerto, nombre).
+    /// </summary>
+    internal void AbrirTransferir()
+    {
+        GoTab(TabTransfer);
+        RaiseFront();
+    }
+
+    /// <summary>
+    /// La ventanita de Transferir de la bandeja. Si ya esta abierta, se la trae al
+    /// frente en vez de abrir otra.
+    /// </summary>
+    private void OpenTransferPopup(string cual)
+    {
+        try
+        {
+            if (_trPopup != null)
+            {
+                if (_trPopup.WindowState == WindowState.Minimized) _trPopup.WindowState = WindowState.Normal;
+                _trPopup.Activate();
+                _trPopup.TransferirFocus(cual);
+                return;
+            }
+            _trPopup = new TransferPopup(this, cual);
+            _trPopup.Closed += (_, _) => _trPopup = null;
+            _trPopup.Show();
+        }
+        catch (Exception e) { CrashLog.Info("ventanita de transferir: " + e.Message); }
+    }
+#endif
+
+    /// <summary>Nombre del equipo, que el panel enseña en su cabecera.</summary>
+    internal string TrDeviceName => DevName;
+
+    internal void TrSetOn(bool on) => ToggleTr(on);
+
+    internal void TrHotspot() => OpenHotspot();
+
+    /// <summary>
+    /// Se ha escrito o pegado el codigo del otro equipo. Se comprueba que conteste
+    /// de verdad, se avisa y se ofrece elegir que mandarle. Si el codigo no se
+    /// entiende, se dice en vez de fallar en silencio.
+    /// </summary>
+    internal void TrJoinCode(string code, TransferPanel? panel = null)
+    {
+        if (!TryBaseUrl(code, out var url))
+        {
+            panel?.SetJoinHint(L.Get("trCodeBad"));
+            if (_lblStatus != null) _lblStatus.Text = L.Get("trCodeBad");
+            return;
+        }
+        _ = Task.Run(async () =>
+        {
+            string txt;
+            try { txt = await TransferClient.Ping(url); } catch { txt = ""; }
+            DispatchUi(() =>
+            {
+                if (!txt.Contains("QBasCopier y Transfer"))
+                {
+                    panel?.SetJoinHint(L.Get("trNoAnswer"));
+                    if (_lblStatus != null) _lblStatus.Text = L.Get("trNoAnswer") + " " + url;
+                    return;
+                }
+                _trPeerUrl = url;
+                panel?.SetJoinHint(L.Get("trJoined"));
+                if (_lblStatus != null) _lblStatus.Text = L.Get("trJoined");
+                if (_trStatus != null) _trStatus.Text = L.Get("trJoined");
+                TrPickForPeer();
+            });
+        });
+    }
+
+    /// <summary>
+    /// Abre el buscador para mandarle cosas al equipo al que ya estamos unidos. En
+    /// el PC es el de la propia app (carpetas, varios a la vez y arrastrar encima);
+    /// en movil, el del sistema, que ya sabe filtrar por tipo.
+    /// </summary>
+    internal void TrPickForPeer()
+    {
+        if (string.IsNullOrEmpty(_trPeerUrl))
+        {
+            if (_trPanel != null) _trPanel.SetJoinHint(L.Get("trJoinHint"));
+            if (_lblStatus != null) _lblStatus.Text = L.Get("trJoinHint");
+            return;
+        }
+#if ANDROID
+        PickFilesAndSend(_trPeerUrl);
+#else
+        var elegidas = SendFilesWindow.Open(this, _trPeerUrl);
+        if (elegidas != null && elegidas.Length > 0) _ = TrSend(_trPeerUrl, elegidas);
+#endif
+    }
+
+    /// <summary>
+    /// Saca la direccion del otro equipo de un texto: el QR entero (que lleva la
+    /// red, la clave y la direccion en lineas sueltas), una direccion o un
+    /// "ip:puerto" a pelo. Lo mismo vale para lo que se pega a mano, para el QR
+    /// escaneado y para el codigo de la tarjeta de Unirse.
+    /// </summary>
+    internal static bool TryBaseUrl(string? texto, out string baseUrl)
+    {
+        baseUrl = "";
+        if (string.IsNullOrWhiteSpace(texto)) return false;
+        foreach (var raw in texto.Split('\n', '\r'))
+        {
+            var line = raw.Trim();
+            if (line.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                line.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                baseUrl = line.EndsWith("/") ? line : line + "/";
+                return true;
+            }
+        }
+        // "192.168.1.5:9527" o "192.168.1.5", sin http delante.
+        foreach (var raw in texto.Split(' ', '\t', '\n', '\r'))
+        {
+            var tok = raw.Trim().TrimEnd('/', '.', ',');
+            if (tok.Length == 0) continue;
+            if (!char.IsDigit(tok[0]) && !tok.StartsWith("localhost", StringComparison.OrdinalIgnoreCase)) continue;
+            var vale = true;
+            foreach (var c in tok)
+                if (!char.IsDigit(c) && c != '.' && c != ':' && !char.IsLetter(c)) { vale = false; break; }
+            if (!vale) continue;
+            baseUrl = "http://" + tok + "/";
+            return true;
+        }
+        return false;
+    }
+
     private static Button Btn(string txt, Action a)
     {
         var b = new Button { Content = txt, FontSize = 12, Margin = new Thickness(2) };
@@ -353,6 +585,7 @@ public sealed partial class MainWindow : UserControl
             _trImg.Source = null;
             _trStatus.Text = "Modo apagado.";
         }
+        TrSyncPanel();
     }
 
     private string MakeQrText()
@@ -389,16 +622,51 @@ public sealed partial class MainWindow : UserControl
         ma.PickTree(uri =>
         {
             if (string.IsNullOrEmpty(uri)) return;
-            S.TransferInbox = uri;
-            S.Save();
-            RestartTrServer();
-            RefreshTrUi();
-            _lblStatus.Text = "Inbox configurado (carpeta del sistema).";
+            SetInbox(uri);
         });
 #else
         _ = PickInboxDesktopAsync();
 #endif
     }
+
+#if ANDROID
+    /// <summary>
+    /// La primera vez que se enciende Transferir en el movil se pregunta donde se
+    /// quiere recibir, y se aprovecha el permiso que da el sistema para crear la
+    /// carpeta de la marca con sus subcarpetas por tipo. Si el usuario dice que no,
+    /// se recibe en la carpeta privada de la app, que no necesita permiso.
+    /// </summary>
+    private void AskInboxFirstTime()
+    {
+        if (_askingInbox) return;
+        _askingInbox = true;
+        _ = PreguntaDestino();
+    }
+
+    private async Task PreguntaDestino()
+    {
+        var ok = await ConfirmAsync(L.Get("sTransfer"), L.Get("trAskFolder"));
+        var ma = QBasCopier.Android.MainActivity.Current;
+        if (!ok || ma == null)
+        {
+            _askingInbox = false;
+            SetInbox(TransferDefaultInbox());
+            if (_trToggle != null) _trToggle.IsChecked = S.TransferOn;
+            return;
+        }
+        ma.PickTreeAt(QBasCopier.Android.DroidDir.Downloads(), uri =>
+        {
+            _askingInbox = false;
+            if (!string.IsNullOrEmpty(uri))
+            {
+                var marca = QBasCopier.Android.DroidDir.EnsurePath(uri, AppName);
+                SetInbox(string.IsNullOrEmpty(marca) ? uri : marca);
+            }
+            else SetInbox(TransferDefaultInbox());
+            ToggleTr(true);
+        });
+    }
+#endif
 
     private void RestartTrServer()
     {
@@ -412,6 +680,83 @@ public sealed partial class MainWindow : UserControl
         }
         catch { }
     }
+
+    /// <summary>
+    /// Cambia la carpeta donde se recibe y deja las subcarpetas por tipo ya
+    /// creadas. Si el servidor estaba encendido solo se le pasa la carpeta nueva:
+    /// no se reinicia, porque reiniciar tiraria los archivos que estuvieran
+    /// entrando en ese momento.
+    /// </summary>
+    private void SetInbox(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        S.TransferInbox = path;
+        S.Save();
+        TransferHost.SortByType = S.TransferSort;
+        if (!TransferHost.PrepareInbox(path))
+            CrashLog.Info("No se pudieron crear las subcarpetas en: " + path);
+        if (_trSrv.Running) _trSrv.Inbox = path;
+        if (_trInboxLbl != null) _trInboxLbl.Text = path;
+        RefreshTrUi();
+        TrSyncPanel();
+        if (_lblStatus != null) _lblStatus.Text = L.Get("trInbox") + ": " + path;
+    }
+
+    /// <summary>Vuelve a la carpeta por defecto de la plataforma.</summary>
+    private void ResetInbox()
+    {
+        S.TransferInbox = "";
+        S.Save();
+        SetInbox(TransferDefaultInbox());
+    }
+
+    /// <summary>
+    /// Elige el volumen de destino. En el PC se aplica directamente; en Android
+    /// hay que abrir el selector del sistema ya situado en ese volumen, porque la
+    /// escritura en la SD o en un USB solo se permite con el permiso dado sobre
+    /// esa carpeta concreta.
+    /// </summary>
+    private void ApplyVolume(int i)
+    {
+        if (i < 0) return;
+        if (i >= _volNames.Count) return;
+        if (i == _volNames.Count - 1) { PickInbox(); return; }   // el "..." es elegir a mano
+#if ANDROID
+        var ma = QBasCopier.Android.MainActivity.Current;
+        if (ma == null) return;
+        var initial = i < _volPick.Count ? _volPick[i] : "";
+        ma.PickTreeAt(uri => { if (!string.IsNullOrEmpty(uri)) SetInbox(uri); }, initial);
+#else
+        var root = i < _volRoots.Count ? _volRoots[i] : "";
+        if (root.Length > 0) SetInbox(System.IO.Path.Combine(root, AppName));
+#endif
+    }
+
+    // Los volumenes se rellenan al construir las opciones y se guardan aqui para
+    // que ApplyVolume, que salta desde el desplegable, sepa a donde va cada uno.
+    private readonly List<string> _volNames = new();
+    private readonly List<string> _volRoots = new();
+    private readonly List<string> _volPick = new();
+
+#if !ANDROID
+    /// <summary>Abre la carpeta de recibidos en el explorador de archivos.</summary>
+    private void OpenInbox()
+    {
+        var dir = string.IsNullOrEmpty(S.TransferInbox) ? TransferDefaultInbox() : S.TransferInbox;
+        try
+        {
+            Directory.CreateDirectory(dir);
+            if (OperatingSystem.IsWindows()) Process.Start("explorer.exe", "\"" + dir + "\"");
+            else if (OperatingSystem.IsMacOS()) Process.Start("open", "\"" + dir + "\"");
+            else Process.Start("xdg-open", "\"" + dir + "\"");
+        }
+        catch (Exception e)
+        {
+            CrashLog.Info("abrir carpeta: " + e.Message);
+            if (_lblStatus != null) _lblStatus.Text = L.Get("trInbox") + ": " + dir;
+        }
+    }
+#endif
 
 #if !ANDROID
     private async Task PickInboxDesktopAsync()
@@ -459,22 +804,130 @@ public sealed partial class MainWindow : UserControl
 #else
         try
         {
-            var dlg = new OpenFileDialog { AllowMultiple = true, Title = "Enviar archivos…" };
-            var r = await dlg.ShowAsync(this);
+            var dlg = new OpenFileDialog { AllowMultiple = true, Title = L.Get("trSendFolder") };
+            var r = await dlg.ShowAsync(Host);
             if (r != null) await SendToBaseUrlAsync(baseUrl, r);
         }
         catch { }
 #endif
     }
 
-    private async Task SendToBaseUrlAsync(string baseUrl, string[] paths)
+    /// <summary>
+    /// Envia lo elegido a un equipo. Una carpeta se manda empaquetada en un .zip
+    /// (el receptor no admite rutas con barras), y el .zip se borra en cuanto sale.
+    /// Sin limites de tamano ni de tipo: lo que el usuario elija, se envia.
+    /// </summary>
+    /// <summary>True si lo que se ha elegido es una carpeta de Android (arbol SAF).</summary>
+    private static bool EsArbolAndroid(string p)
+    {
+#if ANDROID
+        return p.StartsWith("droiddir:", StringComparison.OrdinalIgnoreCase);
+#else
+        return false;
+#endif
+    }
+
+    /// <summary>El nombre con el que se vera la carpeta en el otro equipo.</summary>
+    private static string NombreCarpeta(string path)
+    {
+#if ANDROID
+        if (path.StartsWith("droiddir:", StringComparison.OrdinalIgnoreCase))
+        {
+            var sep = path.IndexOf('|');
+            if (sep > 0) return path[(sep + 1)..];
+        }
+#endif
+        try { return new DirectoryInfo(path).Name; } catch { return path; }
+    }
+
+    /// <summary>
+    /// Recorre la carpeta y devuelve su contenido en el formato que viaja por la
+    /// red. Se lee cada archivo cuando toca mandarlo, no antes: asi da igual lo
+    /// grande que sea la carpeta, no hace falta ni memoria ni temporal.
+    /// </summary>
+    private static (List<(string Rel, long Size, DateTime Modified, Func<Stream> Open)> Files, string PorQue) ListarCarpeta(string path)
+    {
+        var lista = new List<(string, long, DateTime, Func<Stream>)>();
+#if ANDROID
+        if (path.StartsWith("droiddir:", StringComparison.OrdinalIgnoreCase))
+        {
+            var sep = path.IndexOf('|');
+            var raiz = sep > 0 ? path[6..sep] : path[6..];
+            try
+            {
+                var (ficheros, vacias, error) = QBasCopier.Android.DroidDir.Walk(raiz);
+                if (error.Length > 0) return (lista, error);
+                foreach (var v in vacias) lista.Add((v, 0, DateTime.Now, () => Stream.Null));
+                foreach (var f in ficheros)
+                {
+                    var uri = f.Uri;
+                    lista.Add((f.Rel, f.Size, f.Modified, () => QBasCopier.Android.DroidFile.Open(uri)));
+                }
+                return (lista, lista.Count == 0 ? "vacia" : "");
+            }
+            catch (Exception e)
+            {
+                CrashLog.Save("ERROR al leer carpeta SAF: " + e.Message);
+                return (lista, "no-leible");
+            }
+        }
+#endif
+        try
+        {
+            var di = new DirectoryInfo(path);
+            if (!di.Exists) return (lista, "no-existe");
+            var raiz = di.FullName;
+            // Las carpetas vacias tambien se mandan, para que no se pierdan.
+            foreach (var d in di.EnumerateDirectories("*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(raiz, d.FullName);
+                if (!TieneArchivos(d)) lista.Add((rel, 0, d.LastWriteTime, () => Stream.Null));
+            }
+            foreach (var f in di.EnumerateFiles("*", SearchOption.AllDirectories))
+            {
+                var rel = Path.GetRelativePath(raiz, f.FullName);
+                var ruta = f.FullName;
+                var tam = f.Length;
+                lista.Add((rel, tam, f.LastWriteTime, () => new FileStream(ruta, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, FileOptions.SequentialScan)));
+            }
+            return (lista, lista.Count == 0 ? "vacia" : "");
+        }
+        catch (Exception e)
+        {
+            CrashLog.Save("ERROR al listar carpeta: " + e.Message);
+            return (lista, "no-leible");
+        }
+    }
+
+    private static bool TieneArchivos(DirectoryInfo d)
+    {
+        try
+        {
+            using var e = d.EnumerateFileSystemInfos().GetEnumerator();
+            return e.MoveNext();
+        }
+        catch { return true; }
+    }
+
+    private async Task SendToBaseUrlAsync(string baseUrl, string[] paths, Action<string>? status = null)
     {
         if (paths == null || paths.Length == 0) return;
         int sent = 0;
+        void Say(string t)
+        {
+            DispatchUi(() =>
+            {
+                if (_lblStatus != null) _lblStatus.Text = t;
+                if (_trStatus != null) _trStatus.Text = t;
+                status?.Invoke(t);
+            });
+        }
+
         foreach (var path in paths)
         {
             if (string.IsNullOrEmpty(path)) continue;
             string name; long total; Func<Stream> open;
+
             if (path.StartsWith("droid:"))
             {
 #if ANDROID
@@ -484,25 +937,59 @@ public sealed partial class MainWindow : UserControl
                 open = () => QBasCopier.Android.DroidFile.Open(uri);
                 if (total <= 0)
                 {
-                    DispatchUi(() => _lblStatus.Text = "Tamaño desconocido; se omite " + name);
+                    Say("Tamaño desconocido; se omite " + name);
                     continue;
                 }
 #else
-                DispatchUi(() => _lblStatus.Text = "Origen no disponible en este equipo.");
+                Say(L.Get("trCodeBad"));
                 continue;
 #endif
             }
             else
             {
+                if (Directory.Exists(path) || EsArbolAndroid(path))
+                {
+                    // Carpeta: se manda el arbol entero en streaming. Ni zip, ni
+                    // temporal, ni doble escritura: el otro recibe la carpeta montada
+                    // con su contenido y sus fechas, y da igual lo grande que sea.
+                    var nombreCarpeta = NombreCarpeta(path);
+                    var (entradas, porQue) = ListarCarpeta(path);
+                    if (entradas.Count == 0)
+                    {
+                        Say(porQue == "vacia" ? "La carpeta está vacía: " + nombreCarpeta : "No se pudo leer: " + nombreCarpeta);
+                        continue;
+                    }
+                    var peso = 0L;
+                    foreach (var e in entradas) peso += e.Size;
+                    Say("Enviando " + nombreCarpeta + ": " + entradas.Count + " archivos · " + Fmt.Human(peso));
+                    var cts = new CancellationTokenSource();
+                    try
+                    {
+                        var okF = await TransferClient.UploadFolder(baseUrl, nombreCarpeta, entradas,
+                            done => Say("Enviando " + nombreCarpeta + ": " + Fmt.Human(done) + " / " + Fmt.Human(peso)),
+                            paso => Say("Enviando " + paso),
+                            cts.Token);
+                        Say(okF >= 0 ? "Enviado: " + nombreCarpeta : "Error en: " + nombreCarpeta);
+                        if (okF >= 0)
+                        {
+                            sent++;
+                            try { await HistoryStore.AppendAsync(nombreCarpeta, baseUrl, "Carpeta enviada por WiFi (" + entradas.Count + " archivos, " + Fmt.Human(peso) + ")", peso); } catch { }
+                        }
+                    }
+                    finally { cts.Dispose(); }
+                    continue;
+                }
+
                 var fi = new FileInfo(path);
                 if (!fi.Exists)
                 {
-                    DispatchUi(() => _lblStatus.Text = "No existe: " + path);
+                    Say("No existe: " + path);
                     continue;
                 }
                 name = fi.Name; total = fi.Length;
-                open = () => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 256 * 1024, FileOptions.Asynchronous);
+                open = () => new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1024 * 1024, FileOptions.Asynchronous);
             }
+
             var label = name;
             long lastPost = 0;
             var ok = await TransferClient.Upload(baseUrl, name, total, open, done =>
@@ -510,34 +997,51 @@ public sealed partial class MainWindow : UserControl
                 var now = Environment.TickCount64;
                 if (now - lastPost < 150) return;
                 lastPost = now;
-                DispatchUi(() => { if (_trStatus != null) _trStatus.Text = "Enviando " + label + ": " + Fmt.Human(done) + (total > 0 ? "/" + Fmt.Human(total) : ""); });
+                Say("Enviando " + label + ": " + Fmt.Human(done) + (total > 0 ? "/" + Fmt.Human(total) : ""));
             });
-            DispatchUi(() => _lblStatus.Text = (ok >= 0 ? "Enviado: " : "Error en: ") + label);
+            Say((ok >= 0 ? "Enviado: " : "Error en: ") + label);
             if (ok >= 0)
             {
                 sent++;
                 try { await HistoryStore.AppendAsync(label, baseUrl, "Enviado por WiFi (" + Fmt.Human(total) + ")", total); } catch { }
             }
         }
+        Say("Enviados: " + sent + " de " + paths.Length);
         if (_trRx != null) _trRx.Text = "Enviados en sesión: " + sent + " archivo(s)";
+    }
+
+    /// <summary>
+    /// Lo llama el buscador de archivos para mandar lo elegido. Se publica para que
+    /// la ventana pueda cerrar en cuanto se acaba, sin tocar lo de mas.
+    /// </summary>
+    internal async Task TrSend(string baseUrl, string[] paths, Action<string>? status = null)
+    {
+        TransferHost.SortByType = S.TransferSort;
+        await SendToBaseUrlAsync(baseUrl, paths, status);
     }
 
     private void OnScanned(string txt)
     {
-        if (string.IsNullOrWhiteSpace(txt)) { _lblStatus.Text = "QR vacío."; return; }
-        var url = "";
-        foreach (var line in txt.Split('\n'))
-            if (line.Trim().StartsWith("http", StringComparison.OrdinalIgnoreCase)) { url = line.Trim(); break; }
-        if (url.Length == 0) { _lblStatus.Text = "QR no válido para QBasCopier y Transfer."; return; }
-        ConnectBase(url.TrimEnd('/') + "/");
+        if (!TryBaseUrl(txt, out var url))
+        {
+            _lblStatus.Text = L.Get("trCodeBad");
+            if (_trPanel != null) _trPanel.SetJoinHint(L.Get("trCodeBad"));
+            return;
+        }
+        _trPeerUrl = url;
+        ConnectBase(url);
     }
 
     private void ConnectManual()
     {
-        var t = (_trAddr?.Text ?? "").Trim();
-        if (t.Length == 0) { _lblStatus.Text = "Escribe una dirección, p. ej. http://192.168.1.5:9527"; return; }
-        if (!t.StartsWith("http", StringComparison.OrdinalIgnoreCase)) t = "http://" + t;
-        ConnectBase(t.TrimEnd('/') + "/");
+        if (!TryBaseUrl(_trAddr?.Text, out var url))
+        {
+            _lblStatus.Text = L.Get("trCodeBad");
+            if (_trPanel != null) _trPanel.SetJoinHint(L.Get("trCodeBad"));
+            return;
+        }
+        _trPeerUrl = url;
+        ConnectBase(url);
     }
 
     private void ConnectBase(string baseUrl)
@@ -871,12 +1375,14 @@ public sealed partial class MainWindow : UserControl
         outer.Children.Add(bar);
         Grid.SetColumn(bMore, 1);
         outer.Children.Add(bMore);
-        bMore.Click += (_, _) => OpenMenuSheet("list", "menuTools",
+        bMore.Click += (_, _) => OpenMenuSheet("list", "menuTools", new (string Ico, string Text, Action Go)[]
+            {
             ("transfer", "tabTransfer", () => GoTab(TabTransfer)),
             ("options", "tabInterface", () => GoTab(TabOptions)),
             ("history", "tabHistory", () => GoTab(TabHistory)),
             ("about", "tabAbout", () => GoTab(TabAbout)),
-            ("quit", "quit", () => DoQuit()));
+            ("quit", "quit", () => DoQuit())
+            });
         bar.Classes.Add("menuBar");
         outer.SizeChanged += (_, e) =>
         {
@@ -1066,7 +1572,7 @@ public sealed partial class MainWindow : UserControl
             var tight = w < 620;
             var roomy = w >= 1000;
             brand.FontSize = roomy ? 22 : tight ? 15.5 : 18;
-            icon.IconSizeSet(roomy ? 26 : tight ? 19 : 22);
+            Ico.SetSize(icon, roomy ? 26 : tight ? 19 : 22);
             _cmbLangQuick.Width = roomy ? 100 : 92;
             _cmbLangQuick.FontSize = roomy ? 14 : 13;
         };
@@ -1124,10 +1630,10 @@ public sealed partial class MainWindow : UserControl
             RowSpacing = 6
         };
 
-        // El panel unico: una sola lista de archivos, como en un copiador normal.
-        // Antes habia un par de rutas y dos listas (estilo Total Commander), que en
-        // un movil se veia regado. Se toca una carpeta para entrar, se tocan los
-        // archivos para marcarlos, y "Anadir a la lista" los pasa a la cola.
+        // El panel unico: una sola lista de archivos. Se toca una carpeta para
+        // entrar, se tocan los archivos para marcarlos, y "Anadir a la lista" los
+        // pasa a la cola. En un movil una sola lista cabe y se maneja con el dedo;
+        // dos paneles a la vez se veian regados y habia que_scroll_ entre ellos.
         _explorer = new Explorer();
         _explorer.FilesPicked += AddFiles;
         _explorer.FolderChosen += p => { if (_tbTo != null) { _tbTo.Text = p; _ = StartCopy(false); } };
@@ -1161,7 +1667,7 @@ public sealed partial class MainWindow : UserControl
         // Barra individual: aparece solo con un elemento seleccionado y actsua sobre
         // ese elemento. Copiar y Mover en general son los de la barra de abajo.
         _oneBar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center };
-        _oneLbl = MkLbl("", 12.5).Tint(TextSoft);
+        _oneLbl = MkLbl("", 12).Tint(TextSoft);
         _oneLbl.MaxWidth = 260;
         _oneLbl.TextTrimming = TextTrimming.CharacterEllipsis;
         _oneBar.Children.Add(_oneLbl);
@@ -1196,22 +1702,24 @@ public sealed partial class MainWindow : UserControl
         };
 
         // Herramientas de lista: lo que cualquier copiador trae y aqui faltaba.
-        var tools = new WrapPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
+        var tools = new WrapPanel { Orientation = Orientation.Horizontal };
         Button Tool(string ico, string key, Action go)
         {
             var b = new Button
             {
                 Content = Ico.Get(ico, 17, TextSoft),
-                ToolTip = L.Get(key),
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 CornerRadius = new CornerRadius(7),
                 MinWidth = 38,
                 MinHeight = 34,
-                Padding = new Thickness(6, 2, 6, 2)
+                Padding = new Thickness(6, 2, 6, 2),
+                Margin = new Thickness(0, 0, 4, 4)
             };
             b.Click += (_, _) => go();
-            _texts.Add((key, () => b.ToolTip = L.Get(key)));
+            ToolTip.SetTip(b, L.Get(key));
+            Action retitular = () => ToolTip.SetTip(b, L.Get(key));
+            _texts.Add((key, retitular));
             return b;
         }
         tools.Children.Add(Tool("list", "selectAll", SelectAllQueue));
@@ -1411,7 +1919,8 @@ public sealed partial class MainWindow : UserControl
                 if (it.IsDirectory) Directory.Move(it.SourcePath, target);
                 else File.Move(it.SourcePath, target);
                 it.SourcePath = target;
-                it.DestPath = "";
+                // DestPath se calcula a partir de Rel, asi que se actualiza el nombre.
+                it.Rel = newName;
                 it.RaiseAll();
             }
         }
@@ -1656,6 +2165,9 @@ public sealed partial class MainWindow : UserControl
             _texts.Add((key, () => { try { lb.Text = get(); } catch { } }));
             return sp;
         }
+        /// <summary>Control suelto alineado con la columna de los controles de las filas.</summary>
+        Control Indented(Control c) =>
+            new StackPanel { Margin = new Thickness(142, 3, 0, 3), Children = { c } };
         Control Chk(CheckBox cb, string key)
         {
             _texts.Add((key, () => { try { cb.Content = L.Get(key); } catch { } }));
@@ -1670,7 +2182,7 @@ public sealed partial class MainWindow : UserControl
         // ---- Presentacion por grupos, al estilo de los ajustadores buenos: cada
         // ---- bloque con su icono y su titulo, y todo dentro de un ScrollViewer
         // ---- para que en un movil se pueda bajar con el dedo sin perderse.
-        StackPanel Gen = null!, Rend = null!, Comp = null!, Int = null!, Idio = null!, Expl = null!, Log = null!;
+        StackPanel Gen = null!, Rend = null!, Comp = null!, Int = null!, Idio = null!, Expl = null!, Log = null!, Trans = null!;
 
         Control Group(string icon, string titleKey, out StackPanel body)
         {
@@ -1703,6 +2215,7 @@ public sealed partial class MainWindow : UserControl
         var g4 = Group("lang", "sLanguage", out Idio);
         var g5 = Group("plug", "sExplorer", out Expl);
         var g6 = Group("file", "sLog", out Log);
+        var g7 = Group("transfer", "sTransfer", out Trans);
 
         Gen.Children.Add(Row("sLanguage", _cmbLang));
         Gen.Children.Add(Row("units", _cmbSizeUnit));
@@ -1749,6 +2262,107 @@ public sealed partial class MainWindow : UserControl
         Log.Children.Add(bSave);
         Log.Children.Add(bDef);
 
+        // ---- Transferir -------------------------------------------------------
+        // Primero el volumen (interno, SD, USB, otra unidad) y despues la carpeta
+        // dentro de ese volumen. Es el orden que usan las apps de este estilo: dos
+        // clics y el destino esta, en vez de tener que recorrer el arbol de
+        // carpetas cada vez que se quiere cambiar.
+        var volNames = new List<string>();
+        var volRoots = new List<string>();
+        var volPick = new List<string>();
+        try
+        {
+#if ANDROID
+            foreach (var (label, initial) in QBasCopier.Android.DroidDir.Volumes())
+            {
+                volNames.Add(label);
+                volRoots.Add("");
+                volPick.Add(initial);
+            }
+#else
+            foreach (var d in DriveInfo.GetDrives())
+            {
+                if (!d.IsReady) continue;
+                var free = "";
+                try { free = Fmt.Human(d.AvailableFreeSpace); } catch { }
+                volNames.Add(d.Name + "  (" + free + ")");
+                volRoots.Add(d.RootDirectory.FullName);
+                volPick.Add("");
+            }
+#endif
+            volNames.Add("…");
+            volRoots.Add("");
+            volPick.Add("");
+        }
+        catch (Exception e) { CrashLog.Info("volumenes: " + e.Message); }
+        if (volNames.Count == 0) { volNames.Add("…"); volRoots.Add(""); volPick.Add(""); }
+        _volNames.AddRange(volNames);
+        _volRoots.AddRange(volRoots);
+        _volPick.AddRange(volPick);
+
+        _cmbVolume = new ComboBox { ItemsSource = volNames, SelectedIndex = 0, MinWidth = 170, MaxWidth = 230 };
+        _cmbVolume.SelectionChanged += (s, e) => ApplyVolume(_cmbVolume.SelectedIndex);
+
+        _trInboxLbl = new TextBlock
+        {
+            Text = string.IsNullOrEmpty(S.TransferInbox) ? TransferDefaultInbox() : S.TransferInbox,
+            FontSize = 12,
+            Foreground = TextSoft,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = 300
+        };
+
+        var bChange = Btn("…", PickInbox);
+        var bReset = Btn(L.Get("trReset"), ResetInbox);
+#if !ANDROID
+        var bOpen = Btn(L.Get("openFolder"), OpenInbox);
+#else
+        Control bOpen = new Border { Width = 0, Height = 0 };
+#endif
+        var destBox = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 0, VerticalAlignment = VerticalAlignment.Center };
+        destBox.Children.Add(_cmbVolume);
+        destBox.Children.Add(bChange);
+        destBox.Children.Add(bReset);
+        destBox.Children.Add(bOpen);
+
+        Trans.Children.Add(Row("trInbox", new StackPanel
+        {
+            Spacing = 4,
+            Children = { destBox, _trInboxLbl }
+        }));
+
+        var chkSort = MkChk(L.Get("trSort"), S.TransferSort, b =>
+        {
+            S.TransferSort = b;
+            S.Save();
+            TransferHost.SortByType = b;
+            if (!string.IsNullOrEmpty(S.TransferInbox)) TransferHost.PrepareInbox(S.TransferInbox);
+            RefreshTrUi();
+            TrSyncPanel();
+        });
+        _texts.Add(("trSort", () => { try { chkSort.Content = L.Get("trSort"); } catch { } }));
+        Trans.Children.Add(Indented(chkSort));
+
+        var tbDev = new TextBox { Text = S.DeviceName ?? "", Width = 180, Watermark = "android · PC · tablet" };
+        tbDev.TextChanged += (s, e) => { S.DeviceName = tbDev?.Text ?? ""; S.SaveSoon(); };
+        Trans.Children.Add(Row("trDevName", tbDev));
+
+        var tbPort = new TextBox { Text = S.TransferPort.ToString(), Width = 90 };
+        tbPort.TextChanged += (s, e) =>
+        {
+            if (int.TryParse(tbPort.Text, out var p) && p is > 1024 and < 65536)
+            {
+                S.TransferPort = p;
+                S.SaveSoon();
+            }
+        };
+        Trans.Children.Add(Row("trPort", tbPort));
+
+        var chkTrAuto = MkChk(L.Get("trNotify"), S.TransferAuto, b => { S.TransferAuto = b; S.Save(); });
+        _texts.Add(("trNotify", () => { try { chkTrAuto.Content = L.Get("trNotify"); } catch { } }));
+        Trans.Children.Add(Indented(chkTrAuto));
+
         var cols = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 460 };
         void Put(Control c)
         {
@@ -1757,7 +2371,7 @@ public sealed partial class MainWindow : UserControl
             cols.Children.Add(host);
         }
         Put(g1); Put(g2); Put(g3);
-        Put(g4); Put(g5); Put(g6);
+        Put(g4); Put(g5); Put(g6); Put(g7);
 
         var page = new StackPanel { Spacing = 4, Margin = new Thickness(12, 8, 12, 8), Children = { cols } };
         return page;
@@ -1962,7 +2576,7 @@ public sealed partial class MainWindow : UserControl
             Opacity = 0.05,
             FontWeight = FontWeight.Bold,
             LetterSpacing = 6,
-            HorizontalAlignment = TextAlignment.Center
+            TextAlignment = TextAlignment.Center
         };
         var t2 = new TextBlock
         {
@@ -1971,7 +2585,7 @@ public sealed partial class MainWindow : UserControl
             Opacity = 0.07,
             FontSize = 14,
             LetterSpacing = 3,
-            HorizontalAlignment = TextAlignment.Center
+            TextAlignment = TextAlignment.Center
         };
         var sp = new StackPanel
         {
@@ -2595,6 +3209,11 @@ public sealed partial class MainWindow : UserControl
             // que mas se usa de la bandeja, porque deja de escuchar en la red.
             var trOn = S.TransferOn;
             Item((trOn ? "\u2713 " : "") + L.Get("transfer"), ToggleTransfer);
+            // Las dos mitades de Transferir en una ventanita suelta, sin abrir la
+            // ventana principal: enseñar mi QR, o unirse con un codigo.
+            Item(L.Get("trCreate"), () => OpenTransferPopup("crear"));
+            Item(L.Get("trJoinTitle"), () => OpenTransferPopup("unirse"));
+            Item(L.Get("trMore"), () => { GoTab(TabTransfer); RaiseFront(); });
             Item(L.Get("tabHistory"), () => { GoTab(TabHistory); RaiseFront(); });
             menu.Items.Add(new NativeMenuItemSeparator());
 
