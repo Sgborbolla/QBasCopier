@@ -17,7 +17,7 @@ namespace QBasCopier;
 /// notificaciones y el usuario ve el progreso, que es justo lo que hacen los
 /// copiadores buenos.
 /// </summary>
-[Service(Exported = false, ForegroundServiceType = Android.Content.PM.ForegroundService.TypeDataSync)]
+[Service(Exported = false, ForegroundServiceType = global::Android.Content.PM.ForegroundService.TypeDataSync)]
 public class CopyService : Service
 {
     public const string ChannelId = "qbas_progress";
@@ -72,7 +72,7 @@ public class CopyService : Service
         var b = new Notification.Builder(this, ChannelId)
             .SetContentTitle("QBasWing Shuttle")
             .SetContentText(string.IsNullOrWhiteSpace(CurrentText) ? "Preparando…" : CurrentText)
-            .SetSmallIcon(Android.Resource.Drawable.IcDialogInfo)
+            .SetSmallIcon(global::Android.Resource.Drawable.IcDialogInfo)
             .SetOngoing(true)
             .SetOnlyAlertOnce(true);
 
@@ -127,7 +127,7 @@ public class CopyService : Service
     {
         var n = Build2();
         if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
-            StartForeground(NotifId, n, Android.Content.PM.ForegroundService.TypeDataSync);
+            StartForeground(NotifId, n, global::Android.Content.PM.ForegroundService.TypeDataSync);
         else
             StartForeground(NotifId, n);
     }
