@@ -38,6 +38,12 @@ Resultado en `dist\Windows\`:
 - `QBasWing-Shuttle.exe` — portátil (se copia a cualquier Windows x64 y funciona)
 - `QBasWing-Shuttle Setup.exe` — instalador con selector de idioma y música
 
+> ¿Lo quieres en la PC sin compilar? En cada release de GitHub hay dos ZIP:
+> `QBasWing-Shuttle-v1.2-win-x64.zip` (la app ya compilada) y
+> `QBasWing-Shuttle-v1.2-fuentes.zip` (**el proyecto entero**, sin `bin\` ni
+> `obj\`). Descomprime el segundo en el PC y ya puedes abrirlo, tocarlo y
+> compilarlo con `build.bat`.
+
 ### Linux
 ```
 ./build.sh linux-x64            # o simplemente ./build.sh

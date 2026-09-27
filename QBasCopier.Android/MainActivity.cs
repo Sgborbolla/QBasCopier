@@ -354,13 +354,13 @@ public static class DroidDir
                 res.Add((QBasCopier.L.Get("volStorage"), Doc("primary:")));
             }
 
-            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as global::Android.OS.StorageManager;
+            var sm = MainActivity.Current?.StorageManager;
             var vols = sm?.Volumes;
             if (vols != null)
                 foreach (var v in vols)
                 {
                     if (v == null) continue;
-                    if (v.State != global::Android.App.VolumeState.Mounted && v.State != global::Android.App.VolumeState.MountedReadOnly) continue;
+                    if (v.State != global::Android.OS.VolumeState.Mounted && v.State != global::Android.OS.VolumeState.MountedReadOnly) continue;
                     string ruta = "";
                     try { ruta = v.GetPath() ?? ""; } catch { continue; }
                     ruta = ruta.TrimEnd('/');
@@ -446,7 +446,7 @@ public static class DroidDir
         try
         {
             if (!Directory.Exists(destino)) return "";
-            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as global::Android.OS.StorageManager;
+            var sm = MainActivity.Current?.StorageManager;
             if (sm == null) return "";
 
             var vol = "primary";

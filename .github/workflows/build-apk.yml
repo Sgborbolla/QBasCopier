@@ -120,6 +120,16 @@ jobs:
           cd ..
           ls -la QBasWing-Shuttle-v1.2-win-x64.zip
 
+      # El proyecto entero para llevarselo a un PC y compilarlo o abrirlo alli.
+      # git archive solo mete lo versionado, asi que bin/, obj/ y los assets que
+      # genera build.bat en Windows se quedan fuera solos.
+      - name: Empaquetar el proyecto entero
+        run: |
+          set -e
+          git archive --format=zip --prefix=QBasWing-Shuttle-1.2/ \
+            -o QBasWing-Shuttle-v1.2-fuentes.zip HEAD
+          unzip -l QBasWing-Shuttle-v1.2-fuentes.zip | tail -3
+
       - name: Subir el .exe como artefacto
         uses: actions/upload-artifact@v4
         with:
@@ -127,13 +137,22 @@ jobs:
           path: QBasWing-Shuttle-v1.2-win-x64.zip
           if-no-files-found: error
 
-      - name: Publicar el .exe en un release
+      - name: Subir el proyecto como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: QBasWing-Shuttle-v1.2-fuentes
+          path: QBasWing-Shuttle-v1.2-fuentes.zip
+          if-no-files-found: error
+
+      - name: Publicar el .exe y las fuentes en un release
         if: ${{ inputs.publicar == true }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
           gh release delete v1.2-win --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create v1.2-win "QBasWing-Shuttle-v1.2-win-x64.zip" \
+          gh release create v1.2-win \
+            "QBasWing-Shuttle-v1.2-win-x64.zip" \
+            "QBasWing-Shuttle-v1.2-fuentes.zip" \
             --title "QBasWing Shuttle 1.2 para Windows" \
-            --notes "Portable de 64 bits. Descomprime y ejecuta QBasWing-Shuttle.exe. No necesita instalar nada."
+            --notes "Dos archivos. **win-x64**: la app portable, descomprime y ejecuta QBasWing-Shuttle.exe sin instalar nada. **fuentes**: el proyecto entero para abrirlo o compilarlo en tu PC (doble clic en build.bat)."
