@@ -363,7 +363,7 @@ public static class DroidDir
                     if (v == null) continue;
                     if (v.State != global::Android.OS.Environment.MediaMounted && v.State != global::Android.OS.Environment.MediaMountedReadOnly) continue;
                     string ruta = "";
-                    try { ruta = v.Directory; } catch { continue; }
+                    try { ruta = v.Directory?.AbsolutePath ?? ""; } catch { continue; }
                     ruta = ruta.TrimEnd('/');
                     if (ruta.Length == 0) continue;
                     // El almacenamiento principal ya esta en la lista de arriba.
@@ -468,7 +468,7 @@ public static class DroidDir
                     foreach (var v in vols)
                     {
                         string vp = "";
-                        try { vp = v?.Directory; } catch { continue; }
+                        try { vp = v?.Directory?.AbsolutePath ?? ""; } catch { continue; }
                         if (!DentroDe(destino, vp)) continue;
                         raiz = vp;
                         try { uuid = v?.Uuid ?? ""; } catch { }
