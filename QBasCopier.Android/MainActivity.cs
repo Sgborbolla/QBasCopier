@@ -363,13 +363,13 @@ public static class DroidDir
                     if (v == null) continue;
                     if (v.State != global::Android.OS.Environment.MediaMounted && v.State != global::Android.OS.Environment.MediaMountedReadOnly) continue;
                     string ruta = "";
-                    try { ruta = v.GetPath() ?? ""; } catch { continue; }
+                    try { ruta = v.Directory ?? ""; } catch { continue; }
                     ruta = ruta.TrimEnd('/');
                     if (ruta.Length == 0) continue;
                     // El almacenamiento principal ya esta en la lista de arriba.
                     if (montada && string.Equals(ruta, ext.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)) continue;
                     var etiqueta = ruta;
-                    try { etiqueta = v.GetDescription() ?? ruta; } catch { }
+                    try { etiqueta = v.GetDescription(MainActivity.Current!) ?? ruta; } catch { }
                     if (string.IsNullOrWhiteSpace(etiqueta) || etiqueta == ruta)
                     {
                         var sd = ruta.Substring(ruta.LastIndexOf('/') + 1);
@@ -462,7 +462,7 @@ public static class DroidDir
             {
                 // SD o USB: el volumen se identifica con el uuid que da el sistema para
                 // ese sitio, que es el unico dato fiable.
-                var uuid = sm.GetUuidForPath(destino);
+                var uuid = sm.GetUuidForPath(new global::Java.IO.File(destino));
                 if (uuid == null) return "";
                 string raiz = "";
                 var vols = sm.StorageVolumes;
@@ -470,7 +470,7 @@ public static class DroidDir
                     foreach (var v in vols)
                     {
                         string vp = "";
-                        try { vp = v?.GetPath() ?? ""; } catch { continue; }
+                        try { vp = v?.Directory ?? ""; } catch { continue; }
                         if (DentroDe(destino, vp)) { raiz = vp; break; }
                     }
                 if (raiz.Length == 0) return "";
