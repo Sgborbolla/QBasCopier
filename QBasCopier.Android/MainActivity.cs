@@ -363,7 +363,7 @@ public static class DroidDir
                     if (v == null) continue;
                     if (v.State != global::Android.OS.Environment.MediaMounted && v.State != global::Android.OS.Environment.MediaMountedReadOnly) continue;
                     string ruta = "";
-                    try { ruta = v.Directory ?? ""; } catch { continue; }
+                    try { ruta = v.Directory; } catch { continue; }
                     ruta = ruta.TrimEnd('/');
                     if (ruta.Length == 0) continue;
                     // El almacenamiento principal ya esta en la lista de arriba.
@@ -460,22 +460,25 @@ public static class DroidDir
             }
             else
             {
-                // SD o USB: el volumen se identifica con el uuid que da el sistema para
-                // ese sitio, que es el unico dato fiable.
-                var uuid = sm.GetUuidForPath(new global::Java.IO.File(destino));
-                if (uuid == null) return "";
-                string raiz = "";
+                // SD o USB: se localiza el volumen del que forma parte esa ruta y se
+                // usa su uuid, que es el unico dato fiable.
+                string raiz = "", uuid = "";
                 var vols = sm.StorageVolumes;
                 if (vols != null)
                     foreach (var v in vols)
                     {
                         string vp = "";
-                        try { vp = v?.Directory ?? ""; } catch { continue; }
-                        if (DentroDe(destino, vp)) { raiz = vp; break; }
+                        try { vp = v?.Directory; } catch { continue; }
+                        if (!DentroDe(destino, vp)) continue;
+                        raiz = vp;
+                        try { uuid = v?.Uuid ?? ""; } catch { }
+                        break;
                     }
-                if (raiz.Length == 0) return "";
-                vol = uuid.ToString() ?? "";
-                if (vol.Length == 0) return "";
+                if (raiz.Length == 0 || uuid.Length == 0) return "";
+                // El uuid completo es "uuid-1234-5678" y el proveedor de documentos
+                // usa solo la parte de atras.
+                if (uuid.StartsWith("uuid-", StringComparison.OrdinalIgnoreCase)) uuid = uuid[5..];
+                vol = uuid;
                 rel = Path.GetRelativePath(raiz, destino);
             }
 
