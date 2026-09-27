@@ -5,7 +5,7 @@
 
   <Application.Resources>
 
-    <!-- Paleta original QBasCopier (extraída del binario) -->
+    <!-- Paleta de la aplicacion -->
     <SolidColorBrush x:Key="BgBase" Color="#05091C"/>
     <SolidColorBrush x:Key="BgPanel" Color="#060D24"/>
     <SolidColorBrush x:Key="BgDeep" Color="#08122F"/>

@@ -354,8 +354,8 @@ public sealed class Explorer : UserControl
     private static void ReadDir(string path, List<Ent> into)
     {
 #if ANDROID
-        foreach (var (u, n, d, s) in global::QBasCopier.Android.DroidList.Children(path))
-            into.Add(new Ent(u, n, d, s));
+        foreach (var ch in global::QBasCopier.Android.DroidList.Children(path))
+            into.Add(new Ent(ch.Uri, ch.Name, ch.IsDir, ch.Size));
 #else
         try
         {

@@ -1,7 +1,7 @@
 namespace QBasCopier;
 
 /// <summary>
-/// Formatea tamaños de archivo de forma legible.
+/// Formatea tamaños y velocidades de forma legible.
 ///
 /// Antes esto vivía dentro de FilePane, el panel de dos columnas que se quitó
 /// cuando el explorador pasó a ser de un solo panel. Como solo se usaba para
@@ -35,5 +35,24 @@ public static class Fmt
         int ia = 0;
         while (va >= 1024 && ia < Units.Length - 1) { va /= 1024; ia++; }
         return $"{va:0.##} {Units[ia]}";
+    }
+
+    /// <summary>
+    /// Velocidad de transferencia en bytes por segundo ("12,4 MB/s"). Sin esto el
+    /// usuario ve cuantos bytes van y no si la red va rapido o lento, que es justo
+    /// lo que se quiere saber al mandar un video de 2 GB.
+    /// </summary>
+    public static string Rate(double bytesPerSecond)
+    {
+        if (double.IsNaN(bytesPerSecond) || bytesPerSecond < 0) return "—";
+        return Human((long)bytesPerSecond) + "/s";
+    }
+
+    /// <summary>Un tiempo en segundos como "2m 3s" o "1h 2m 3s".</summary>
+    public static string Time(double sec)
+    {
+        if (double.IsNaN(sec) || sec < 0 || sec > 100000) return "—";
+        var ts = TimeSpan.FromSeconds(sec);
+        return ts.TotalHours >= 1 ? $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s" : $"{ts.Minutes}m {ts.Seconds}s";
     }
 }

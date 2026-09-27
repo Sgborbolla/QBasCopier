@@ -55,7 +55,7 @@ public partial class MainWindow : Window
         catch { }
         header.Children.Add(img);
         var title = new StackPanel { Margin = new Thickness(14, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        title.Children.Add(new TextBlock { Text = "QBasWing Shuttle · QBasCopier y Transfer", FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Brushes("#FBBF24") });
+        title.Children.Add(new TextBlock { Text = "QBasWing Shuttle", FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Brushes("#FBBF24") });
         title.Children.Add(new TextBlock { Text = "© 2026", FontSize = 13, Foreground = Brushes("#9FB3E8") });
         header.Children.Add(title);
         Grid.SetRow(header, 0);
@@ -93,7 +93,7 @@ public partial class MainWindow : Window
         _btnMain.Click += async (s, e) => await Install();
         _btnDone.Content = "launch"; _btnDone.Width = 150; _btnDone.IsEnabled = false; _btnDone.Visibility = Visibility.Collapsed;
         _btnDone.Background = Brushes("#FBBF24"); _btnDone.Foreground = Brushes("#05091C");
-        _btnDone.Click += (s, e) => { try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_destExe) { UseShellExecute = true }); } catch { } Close(); };
+        _btnDone.Click += (s, e) => { if (_destExe == null) return; try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_destExe) { UseShellExecute = true }); } catch { } Close(); };
         btns.Children.Add(_btnMain);
         btns.Children.Add(_btnDone);
         panel.Children.Add(btns);
@@ -105,7 +105,7 @@ public partial class MainWindow : Window
         grid.Children.Add(footer);
 
         // marca de agua
-        var wm = new TextBlock { Text = "QBasWing Shuttle · QBasCopier y Transfer", FontSize = 60, FontWeight = FontWeights.Bold, Foreground = Brushes("#6FB1FC"), Opacity = 0.05, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        var wm = new TextBlock { Text = "QBasWing Shuttle", FontSize = 60, FontWeight = FontWeights.Bold, Foreground = Brushes("#6FB1FC"), Opacity = 0.05, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
         Grid.SetRow(wm, 1);
         grid.Children.Add(wm);
 
@@ -118,7 +118,7 @@ public partial class MainWindow : Window
     private static string MachineText()
     {
         var n = System.Environment.MachineName.Trim();
-        return $"QBasWing Shuttle · QBasCopier y Transfer · {n} · © 2026";
+        return $"QBasWing Shuttle · {n} · © 2026";
     }
 
     private TextBlock MakeLabel(string key, int idx)

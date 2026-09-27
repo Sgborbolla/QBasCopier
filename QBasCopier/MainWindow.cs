@@ -83,11 +83,11 @@ public sealed partial class MainWindow : UserControl
     /// Nombre completo. En la barra superior, la marca de agua, el pie y Acerca de
     /// siempre sale el nombre entero, no la abreviatura.
     /// </summary>
-    public const string AppFullName = AppName + " · QBasCopier y Transfer";
+    public const string AppFullName = AppName;
 
     private const string TabCopy = "copy", TabTransfer = "transfer", TabOptions = "options", TabHistory = "history", TabAbout = "about";
     private const string AboutText =
-        "QBasCopier y Transfer crece de un sueño: el de QBaswing Designer, una pequeña compañía independiente " +
+        "QBasWing Shuttle crece de un sueño: el de una pequeña compañía independiente " +
         "que nació de las manos del Dr. Sergio Grabiel Borbolla Verdecia. Desde Cuba, con el corazón " +
         "lleno de amor por la medicina y por el mundo digital, cada línea se escribe con esfuerzo y " +
         "esperanza, aunque a veces la tecnología no alcance.\n\n" +
@@ -99,7 +99,7 @@ public sealed partial class MainWindow : UserControl
         "Este es un pequeño homenaje a la idea de que con dedicación se cumplen sueños y se entregan " +
         "al mundo obras útiles y hermosas. Gracias por formar parte de él.\n\n— SGBV";
 
-    // ---------------------- Transferir (QBasCopier y Transfer) ----------------------
+    // ---------------------- Transferir ----------------------
     private readonly TransferHost _trSrv = new();
     private CheckBox? _trToggle;
     private Image? _trImg;
@@ -130,6 +130,10 @@ public sealed partial class MainWindow : UserControl
     private void InitTransfer()
     {
         TransferHost.DeviceName = DevName;
+        // Ritmo de lo que entra: se reinicia con cada elemento recibido, para que la
+        // velocidad sea la de ahora y no una media de todo lo descargado.
+        var relojRx = System.Diagnostics.Stopwatch.StartNew();
+        long ultimoPostRx = 0, desdeRx = 0;
         _trSrv.FileReceived += (path, bytes) =>
         {
             var name = System.IO.Path.GetFileName(path);
@@ -147,9 +151,29 @@ public sealed partial class MainWindow : UserControl
                 _trRxBytes += bytes;
                 _lblStatus.Text = "Recibido: " + name + " (" + Fmt.Human(bytes) + ")";
                 if (_trStatus != null) _trStatus.Text = "Recibido: " + name;
+                desdeRx = 0;
+                relojRx.Restart();
 #if ANDROID
                 if (S.TransferAuto) QBasCopier.Android.DroidCtx.Toast("Recibido: " + name);
 #endif
+            });
+        };
+        // Progreso de lo que entra ahora mismo. Sin esto, un archivo de 2 GB aparecia
+        // de golpe al final y no se sabia si iba o se habia quedado parado.
+        _trSrv.Receiving += (nombre, hecho, total) =>
+        {
+            var ahora = Environment.TickCount64;
+            if (ahora - ultimoPostRx < 250) return;
+            var seg = relojRx.Elapsed.TotalSeconds;
+            if (seg < 0.7) return;
+            ultimoPostRx = ahora;
+            var ritmo = Fmt.Rate((hecho - desdeRx) / seg);
+            DispatchUi(() =>
+            {
+                var t = L.Get("receiving") + " " + nombre + ": " + Fmt.Human(hecho)
+                    + (total > 0 ? " / " + Fmt.Human(total) : "") + " · " + ritmo;
+                _lblStatus.Text = t;
+                if (_trStatus != null) _trStatus.Text = t;
             });
         };
         Discovery.Changed += () => DispatchUi(FillPeers);
@@ -188,7 +212,7 @@ public sealed partial class MainWindow : UserControl
     private static string DeviceNameOrHost()
     {
         try { return (string.IsNullOrWhiteSpace(TransferHost.DeviceName) ? Environment.MachineName : TransferHost.DeviceName); }
-        catch { return "QBasCopier"; }
+        catch { return AppName; }
     }
 
     private void ToggleTr(bool on)
@@ -237,6 +261,7 @@ public sealed partial class MainWindow : UserControl
         // inbox, y el inbox nunca llegaba al disco.
         S.TransferOn = on;
         S.Save();
+        if (_trToggle != null && _trToggle.IsChecked != on) _trToggle.IsChecked = on;
         RefreshTrUi();
     }
 
@@ -285,6 +310,7 @@ public sealed partial class MainWindow : UserControl
         _trPanel.CreateHotspot += () => { OpenHotspot(); TrSyncPanel(); };
         _trPanel.JoinWithCode += code => TrJoinCode(code, _trPanel);
         _trPanel.PickFiles += () => TrPickForPeer();
+        _trPanel.PickFolder += () => TrPickFolderAndSend();
 
         var det = new Expander
         {
@@ -484,7 +510,7 @@ public sealed partial class MainWindow : UserControl
             try { txt = await TransferClient.Ping(url); } catch { txt = ""; }
             DispatchUi(() =>
             {
-                if (!txt.Contains("QBasCopier y Transfer"))
+                if (!EsNuestro(txt))
                 {
                     panel?.SetJoinHint(L.Get("trNoAnswer"));
                     if (_lblStatus != null) _lblStatus.Text = L.Get("trNoAnswer") + " " + url;
@@ -502,9 +528,10 @@ public sealed partial class MainWindow : UserControl
     /// <summary>
     /// Abre el buscador para mandarle cosas al equipo al que ya estamos unidos. En
     /// el PC es el de la propia app (carpetas, varios a la vez y arrastrar encima);
-    /// en movil, el del sistema, que ya sabe filtrar por tipo.
+    /// en movil, el del sistema, que ya sabe filtrar por tipo. Se espera de verdad a
+    /// que se cierre el buscador, que es cuando ya se sabe que se eligio.
     /// </summary>
-    internal void TrPickForPeer()
+    internal async Task TrPickForPeer()
     {
         if (string.IsNullOrEmpty(_trPeerUrl))
         {
@@ -515,8 +542,12 @@ public sealed partial class MainWindow : UserControl
 #if ANDROID
         PickFilesAndSend(_trPeerUrl);
 #else
-        var elegidas = SendFilesWindow.Open(this, _trPeerUrl);
-        if (elegidas != null && elegidas.Length > 0) _ = TrSend(_trPeerUrl, elegidas);
+        try
+        {
+            var elegidas = await SendFilesWindow.Open(this, _trPeerUrl);
+            if (elegidas != null && elegidas.Length > 0) _ = TrSend(_trPeerUrl, elegidas);
+        }
+        catch (Exception e) { CrashLog.Save("ERROR al abrir el buscador de envio: " + e.Message); }
 #endif
     }
 
@@ -591,7 +622,7 @@ public sealed partial class MainWindow : UserControl
     private string MakeQrText()
     {
         var sb = new System.Text.StringBuilder();
-        sb.AppendLine("QBasCopier y Transfer");
+        sb.AppendLine(AppFullName);
         sb.AppendLine("Red: " + S.TransferNet);
         sb.AppendLine("Clave: " + S.TransferKey);
         sb.AppendLine("WIFI:T:WPA;S:" + S.TransferNet + ";P:" + S.TransferKey + ";;");
@@ -633,8 +664,12 @@ public sealed partial class MainWindow : UserControl
     /// <summary>
     /// La primera vez que se enciende Transferir en el movil se pregunta donde se
     /// quiere recibir, y se aprovecha el permiso que da el sistema para crear la
-    /// carpeta de la marca con sus subcarpetas por tipo. Si el usuario dice que no,
-    /// se recibe en la carpeta privada de la app, que no necesita permiso.
+    /// carpeta de la marca con sus subcarpetas por tipo.
+    ///
+    /// Si el usuario dice que no, o cierra el selector, se recibe en la carpeta
+    /// privada de la app, que no necesita permiso, y Transferir se queda encendido.
+    /// Antes, cancelar la pregunta dejaba Transferir apagado sin explicar nada y sin
+    /// forma de saber por que no arrancaba.
     /// </summary>
     private void AskInboxFirstTime()
     {
@@ -645,13 +680,13 @@ public sealed partial class MainWindow : UserControl
 
     private async Task PreguntaDestino()
     {
-        var ok = await ConfirmAsync(L.Get("sTransfer"), L.Get("trAskFolder"));
         var ma = QBasCopier.Android.MainActivity.Current;
+        var ok = ma != null && await ConfirmAsync(L.Get("sTransfer"), L.Get("trAskFolder"));
         if (!ok || ma == null)
         {
             _askingInbox = false;
             SetInbox(TransferDefaultInbox());
-            if (_trToggle != null) _trToggle.IsChecked = S.TransferOn;
+            ToggleTr(true);
             return;
         }
         ma.PickTreeAt(QBasCopier.Android.DroidDir.Downloads(), uri =>
@@ -725,7 +760,9 @@ public sealed partial class MainWindow : UserControl
         var ma = QBasCopier.Android.MainActivity.Current;
         if (ma == null) return;
         var initial = i < _volPick.Count ? _volPick[i] : "";
-        ma.PickTreeAt(uri => { if (!string.IsNullOrEmpty(uri)) SetInbox(uri); }, initial);
+        // PickTreeAt(primero donde abrir, luego que hacer): el orden importa, con el
+        // callback en el primer sitio no compilaba.
+        ma.PickTreeAt(initial, uri => { if (!string.IsNullOrEmpty(uri)) SetInbox(uri); });
 #else
         var root = i < _volRoots.Count ? _volRoots[i] : "";
         if (root.Length > 0) SetInbox(System.IO.Path.Combine(root, AppName));
@@ -812,11 +849,6 @@ public sealed partial class MainWindow : UserControl
 #endif
     }
 
-    /// <summary>
-    /// Envia lo elegido a un equipo. Una carpeta se manda empaquetada en un .zip
-    /// (el receptor no admite rutas con barras), y el .zip se borra en cuanto sale.
-    /// Sin limites de tamano ni de tipo: lo que el usuario elija, se envia.
-    /// </summary>
     /// <summary>True si lo que se ha elegido es una carpeta de Android (arbol SAF).</summary>
     private static bool EsArbolAndroid(string p)
     {
@@ -857,7 +889,7 @@ public sealed partial class MainWindow : UserControl
             {
                 var (ficheros, vacias, error) = QBasCopier.Android.DroidDir.Walk(raiz);
                 if (error.Length > 0) return (lista, error);
-                foreach (var v in vacias) lista.Add((v, 0, DateTime.Now, () => Stream.Null));
+                foreach (var v in vacias) lista.Add((MarcaCarpetaVacia(v), 0, DateTime.Now, () => Stream.Null));
                 foreach (var f in ficheros)
                 {
                     var uri = f.Uri;
@@ -877,11 +909,12 @@ public sealed partial class MainWindow : UserControl
             var di = new DirectoryInfo(path);
             if (!di.Exists) return (lista, "no-existe");
             var raiz = di.FullName;
-            // Las carpetas vacias tambien se mandan, para que no se pierdan.
+            // Las carpetas vacias tambien se mandan, para que no se pierdan. Van con
+            // "/" al final: si no, quien las recibe las crearia como archivo de 0 bytes.
             foreach (var d in di.EnumerateDirectories("*", SearchOption.AllDirectories))
             {
                 var rel = Path.GetRelativePath(raiz, d.FullName);
-                if (!TieneArchivos(d)) lista.Add((rel, 0, d.LastWriteTime, () => Stream.Null));
+                if (!TieneArchivos(d)) lista.Add((MarcaCarpetaVacia(rel), 0, d.LastWriteTime, () => Stream.Null));
             }
             foreach (var f in di.EnumerateFiles("*", SearchOption.AllDirectories))
             {
@@ -909,6 +942,14 @@ public sealed partial class MainWindow : UserControl
         catch { return true; }
     }
 
+    /// <summary>
+    /// En el protocolo una carpeta vacia viaja con tamano 0 y la ruta terminada en
+    /// "/". Sin esa "/" quien la recibe no puede saber que es una carpeta y la crea
+    /// como un archivo de cero bytes.
+    /// </summary>
+    private static string MarcaCarpetaVacia(string rel) =>
+        rel.EndsWith('/') || rel.EndsWith(Path.DirectorySeparatorChar) ? rel : rel + "/";
+
     private async Task SendToBaseUrlAsync(string baseUrl, string[] paths, Action<string>? status = null)
     {
         if (paths == null || paths.Length == 0) return;
@@ -921,6 +962,22 @@ public sealed partial class MainWindow : UserControl
                 if (_trStatus != null) _trStatus.Text = t;
                 status?.Invoke(t);
             });
+        }
+
+        // Medidor de velocidad. Se reinicia en cada elemento y se avisa de lo que lleva
+        // arrastrado, para que el usuario sepa si va rapido o si algo se atasca.
+        var reloj = System.Diagnostics.Stopwatch.StartNew();
+        long desdeAqui = 0;
+        string Ritmo(long hecho)
+        {
+            var seg = reloj.Elapsed.TotalSeconds;
+            if (seg < 0.7) return "";
+            return Fmt.Rate((hecho - desdeAqui) / seg);
+        }
+        void Empezar()
+        {
+            reloj.Restart();
+            desdeAqui = 0;
         }
 
         foreach (var path in paths)
@@ -961,12 +1018,18 @@ public sealed partial class MainWindow : UserControl
                     }
                     var peso = 0L;
                     foreach (var e in entradas) peso += e.Size;
+                    Empezar();
                     Say("Enviando " + nombreCarpeta + ": " + entradas.Count + " archivos · " + Fmt.Human(peso));
                     var cts = new CancellationTokenSource();
                     try
                     {
                         var okF = await TransferClient.UploadFolder(baseUrl, nombreCarpeta, entradas,
-                            done => Say("Enviando " + nombreCarpeta + ": " + Fmt.Human(done) + " / " + Fmt.Human(peso)),
+                            done =>
+                            {
+                                var ritmo = Ritmo(done);
+                                Say(L.Get("sending") + " " + nombreCarpeta + ": " + Fmt.Human(done) + " / " + Fmt.Human(peso)
+                                    + (ritmo.Length > 0 ? " · " + ritmo : ""));
+                            },
                             paso => Say("Enviando " + paso),
                             cts.Token);
                         Say(okF >= 0 ? "Enviado: " + nombreCarpeta : "Error en: " + nombreCarpeta);
@@ -992,12 +1055,15 @@ public sealed partial class MainWindow : UserControl
 
             var label = name;
             long lastPost = 0;
+            Empezar();
             var ok = await TransferClient.Upload(baseUrl, name, total, open, done =>
             {
                 var now = Environment.TickCount64;
                 if (now - lastPost < 150) return;
                 lastPost = now;
-                Say("Enviando " + label + ": " + Fmt.Human(done) + (total > 0 ? "/" + Fmt.Human(total) : ""));
+                var ritmo = Ritmo(done);
+                Say(L.Get("sending") + " " + label + ": " + Fmt.Human(done) + (total > 0 ? "/" + Fmt.Human(total) : "")
+                    + (ritmo.Length > 0 ? " · " + ritmo : ""));
             });
             Say((ok >= 0 ? "Enviado: " : "Error en: ") + label);
             if (ok >= 0)
@@ -1009,6 +1075,49 @@ public sealed partial class MainWindow : UserControl
         Say("Enviados: " + sent + " de " + paths.Length);
         if (_trRx != null) _trRx.Text = "Enviados en sesión: " + sent + " archivo(s)";
     }
+
+    /// <summary>
+    /// Manda una CARPETA entera al equipo al que estamos unidos. Va en su propio
+    /// boton porque no es lo mismo que mandar archivos: lo que sale es el arbol
+    /// completo, con su estructura y sus fechas, y en el otro equipo llega como
+    /// carpeta. Sin limites de tamano, sin comprimir y sin temporal por el camino.
+    /// </summary>
+    internal void TrPickFolderAndSend()
+    {
+        if (string.IsNullOrEmpty(_trPeerUrl))
+        {
+            if (_trPanel != null) _trPanel.SetJoinHint(L.Get("trJoinHint"));
+            if (_lblStatus != null) _lblStatus.Text = L.Get("trJoinHint");
+            return;
+        }
+#if ANDROID
+        var ma = QBasCopier.Android.MainActivity.Current;
+        if (ma == null) return;
+        var url = _trPeerUrl;
+        ma.PickTree(uri =>
+        {
+            if (string.IsNullOrEmpty(uri)) return;
+            // El nombre visible de la carpeta es lo que se ve luego en el otro equipo.
+            var destino = "droiddir:" + uri + "|" + QBasCopier.Android.DroidDir.Name(uri);
+            _ = SendToBaseUrlAsync(url, new[] { destino });
+        });
+#else
+        _ = PickFolderAndSendDesktopAsync(_trPeerUrl);
+#endif
+    }
+
+#if !ANDROID
+    private async Task PickFolderAndSendDesktopAsync(string baseUrl)
+    {
+        try
+        {
+            var dlg = new OpenFolderDialog { Title = L.Get("trSendFolder") };
+            var r = await dlg.ShowAsync(Host);
+            if (!string.IsNullOrEmpty(r)) await SendToBaseUrlAsync(baseUrl, new[] { r });
+        }
+        catch (Exception e) { CrashLog.Save("ERROR al elegir carpeta para enviar: " + e.Message); }
+    }
+#endif
 
     /// <summary>
     /// Lo llama el buscador de archivos para mandar lo elegido. Se publica para que
@@ -1044,6 +1153,15 @@ public sealed partial class MainWindow : UserControl
         ConnectBase(url);
     }
 
+    /// <summary>
+    /// True si el otro equipo es nuestra app. Se aceptan los dos nombres porque un
+    /// equipo puede tener una version anterior, que contestaba con el nombre viejo:
+    /// si solo se aceptara el nuevo, dos maquinas con versiones distintas se quedarían
+    /// sin verse y el usuario no sabria por que.
+    /// </summary>
+    private static bool EsNuestro(string respuesta) =>
+        respuesta.Contains("QBasWing Shuttle") || respuesta.Contains("QBasCopier y Transfer");
+
     private void ConnectBase(string baseUrl)
     {
         _ = Task.Run(async () =>
@@ -1053,7 +1171,7 @@ public sealed partial class MainWindow : UserControl
             catch { txt = ""; }
             DispatchUi(() =>
             {
-                if (txt.Contains("QBasCopier y Transfer"))
+                if (EsNuestro(txt))
                 {
                     _lblStatus.Text = "Conectado a: " + baseUrl;
                     if (_trStatus != null) _trStatus.Text = "Conectado a: " + baseUrl;
@@ -1223,8 +1341,20 @@ public sealed partial class MainWindow : UserControl
             }
         }
 
+#if !ANDROID
+        // Lanzada desde el menu del Explorador: Windows solo pasa el primer archivo, asi
+        // que se pregunta al Explorador cual es la seleccion entera. Con un gestor de
+        // archivos que si pasa todas las rutas, el aviso simplemente no viene.
+        if (args.Contains("--from-shell")) ShellSelection.Completa(paths, ref dest, move);
+#endif
         ReloadTexts();
-        BuildTray();
+        // Lanzada desde el menu del Explorador o de otro gestor con --copy/--move: se
+        // copia sin ensenar la ventana principal, que para eso ya esta el Explorador.
+        // Lo unico que aparece en pantalla es la ventanita de progreso.
+        _suelto = paths.Count > 0 && !string.IsNullOrEmpty(dest);
+        // Y sin icono en la bandeja: nadie ha pedido que la app quede por ahi, y una
+        // copia de un minuto no necesita un icono que quitar luego.
+        if (!_suelto) BuildTray();
         ApplyTransferKey();
         if (paths.Count > 0) AddFiles(paths.ToArray());
         if (!string.IsNullOrEmpty(dest)) _tbTo.Text = dest;
@@ -1237,8 +1367,11 @@ public sealed partial class MainWindow : UserControl
             return;
         }
 #if !ANDROID
-        Host?.Show();
-        Host?.Activate();
+        if (!_suelto)
+        {
+            Host?.Show();
+            Host?.Activate();
+        }
 #else
         // Si se dejo activado, la app lo encendia de nuevo pero la casilla se quedaba
         // en apagado: la UI mentia sobre lo que realmente estaba haciendo.
@@ -2785,14 +2918,14 @@ public sealed partial class MainWindow : UserControl
             _miniLbl.Text = _lblProg.Text + "  " + _lblRate.Text;
             _miniBar.Value = pct;
             #if !ANDROID
-            if (S.ShowInTitle && Host != null) Host.Title = $"QBasCopier y Transfer · {pct:0.#}%";
+            if (S.ShowInTitle && Host != null) Host.Title = $"QBasWing Shuttle · {pct:0.#}%";
 #endif
         }
         else
         {
             _lastTickTicks = 0;
 #if !ANDROID
-            if (S.ShowInTitle && Host != null) Host.Title = "QBasCopier y Transfer";
+            if (S.ShowInTitle && Host != null) Host.Title = "QBasWing Shuttle";
 #endif
         }
 
@@ -2806,12 +2939,9 @@ public sealed partial class MainWindow : UserControl
         if (cmd != null) ProcessForwarded(cmd);
     }
 
-    private static string FmtTime(double sec)
-    {
-        sec = Math.Max(0, sec);
-        var ts = TimeSpan.FromSeconds(sec);
-        return ts.TotalHours >= 1 ? $"{(int)ts.TotalHours}h {ts.Minutes}m {ts.Seconds}s" : $"{ts.Minutes}m {ts.Seconds}s";
-    }
+    // El tiempo se formatea en Fmt, que lo usan tambien las ventanitas de copia y
+    // de transferir: antes vivia aqui y se copiaba a mano en cada sitio.
+    private static string FmtTime(double sec) => Fmt.Time(Math.Max(0, sec));
 
     // ------------------------------------------------------------------ cola
     private void AddFiles(string[] paths) => Enqueue(paths, _tbTo?.Text ?? "", false);
@@ -2985,6 +3115,7 @@ public sealed partial class MainWindow : UserControl
         _bResume.IsEnabled = false;
         _bSkip.IsEnabled = _bCancel.IsEnabled = true;
         _tabs.SelectedIndex = 1;
+        AbreVentanita(move, dest!);
 
         try { await _engine.RunAsync(); }
         catch { }
@@ -3005,10 +3136,73 @@ public sealed partial class MainWindow : UserControl
         catch { return 0; }
     }
 
+    // ------------------------------------------------------- ventanita de copia
+#if !ANDROID
+    private CopyPopup? _pop;
+    private bool _suelto;      // lanzada desde el Explorador u otro gestor: sin ventana principal
+
+    /// <summary>
+    /// Al copiar o mover se abre la ventanita. Si la copia se lanzo desde el menu del
+    /// Explorador (--copy/--move) la ventana principal no se enseño nunca, y entonces
+    /// esta ventanita es todo lo que hay en pantalla; al cerrarse, la app se va.
+    /// </summary>
+    private void AbreVentanita(bool move, string dest)
+    {
+        var motor = _engine;
+        if (motor == null) return;
+        _pop?.Close();
+        _pop = new CopyPopup(motor, move, dest, _suelto,
+            abrirDestino: () => OpenDest(dest),
+            reintentar: () => ReintentaFallidos(motor),
+            alTerminar: () =>
+            {
+                // Cerrar la ventanita no cancela la copia: la copia sigue su curso
+                // sola y la app se apaga cuando termine, que es lo de OnBatchEnd.
+                if (_suelto) Dispatcher.UIThread.Post(() => { if (!motor.IsBusy) DoQuit(); });
+            });
+        _pop.Show();
+        _pop.Closed += (_, _) => _pop = null;
+    }
+
+    private void OpenDest(string dest)
+    {
+        try
+        {
+            var d = dest;
+            if (CopyEngine.IsSafPath(d)) return;   // en Android no hay carpeta que abrir
+            if (!Directory.Exists(d)) d = Path.GetDirectoryName(d.TrimEnd('/', '\\')) ?? d;
+            if (Directory.Exists(d))
+                Process.Start(new ProcessStartInfo { FileName = d, UseShellExecute = true });
+        }
+        catch (Exception e) { CrashLog.Save("ERROR al abrir el destino: " + e.Message); }
+    }
+
+    /// <summary>Vuelve a poner en la cola lo que fallo, para no repetir todo desde arriba.</summary>
+    private void ReintentaFallidos(CopyEngine motor)
+    {
+        var malos = motor.Snapshot().Where(i => i.State is ItemState.Error or ItemState.Cancelled).ToList();
+        if (malos.Count == 0) return;
+        foreach (var it in malos) it.State = ItemState.Ready;
+        // Los bytes ya copiados cuentan como hechos de verdad, pero al reintentar solo
+        // se esta copiando lo que faltaba, asi que la cuenta vuelve a empezar en el
+        // punto donde se corto.
+        motor.ReiniciaTotales();
+        _pop?.Reanudando();
+        _ = motor.RunAsync();
+    }
+#endif
+
     private async void OnBatchEnd(int ok, int err, bool cancelled)
     {
         var done = _engine?.DoneBytes ?? 0;
         _engine = null;
+#if !ANDROID
+        // La ventanita se despide: verde si todo fue bien, y con "! N" si quedo algo
+        // sin copiar, que es justo cuando el usuario tiene que enterarse. El puntero
+        // se limpia solo cuando la ventanita se cierra de verdad, que puede ser un
+        // par de segundos despues (o mas, si quedo un error y hay que mirar la lista).
+        _pop?.Terminada(err);
+#endif
         // Si era una copia de un solo elemento, el resto de la lista vuelve.
         if (_oneShot is { Count: > 0 })
         {
@@ -3019,6 +3213,15 @@ public sealed partial class MainWindow : UserControl
         }
         await HistoryStore.AppendAsync(_tbFrom.Text ?? "", _tbTo.Text ?? "", cancelled ? L.Get("histCancelled") : err > 0 ? L.Get("histErrors") : L.Get("histOk"), done);
         RefreshHistory();
+#if !ANDROID
+        if (_suelto)
+        {
+            // La ventanita se va sola en un par de segundos. Si el usuario ya la
+            // cerro antes, no queda nada en pantalla y la app se apaga ya.
+            if (_pop == null) DoQuit();
+            return;   // aqui no hay ventana principal ni bandeja que rehacer
+        }
+#endif
         if (S.AfterDone == "close" || (S.AfterDone == "keepIfErrors" && err == 0)) DoQuit();
         else BuildTray();
     }
@@ -3026,8 +3229,22 @@ public sealed partial class MainWindow : UserControl
     private void DoQuit()
     {
         _forceClose = true;
-        try { Settings.Flush(); S.Save(); } catch { }
+        try { Settings.Flush(); if (!_suelto) S.Save(); } catch { }
 #if !ANDROID
+        // Cuando se lanzo desde fuera, la ventana principal nunca se enseño y por eso
+        // no vale cerrarla: lo que hay que cerrar es la ventanita, que es la unica
+        // ventana viva. Cerrarla dispara el apagado de la app.
+        if (_suelto)
+        {
+            _pop?.Close();
+            if (Host?.IsVisible == true) return;
+            // Solo estaba la ventanita, y ya esta cerrada: no queda nada que cerrar, asi
+            // que se apaga la app a mano. La ventana principal nunca se vio y por eso
+            // su evento de cierre no sirve para terminar.
+            if (Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime lt)
+                lt.Shutdown();
+            return;
+        }
         Host?.Close();
 #else
         // Al ser MainWindow un UserControl ya no hay Window.Close(): sin esto, la opcion
@@ -3153,7 +3370,11 @@ public sealed partial class MainWindow : UserControl
             else if (after && !parts[i].StartsWith("--")) paths.Add(parts[i]);
         }
         if (paths.Count > 0) Enqueue(paths.ToArray(), dest ?? "", move);
-        if (!string.IsNullOrEmpty(dest)) _tbTo.Text = dest;
+        if (string.IsNullOrEmpty(dest)) return;
+        _tbTo.Text = dest;
+        // Si ya se sabe donde va, se copia sin preguntar nada: la idea del menu del
+        // Explorador es que pulse y ya este. La ventanita va enseguida en medio.
+        if (_engine?.IsBusy != true) _ = Task.Delay(80).ContinueWith(_ => Dispatcher.UIThread.Post(() => _ = StartCopy(move)));
     }
 
     // ----------------------------------------------------------- bandeja

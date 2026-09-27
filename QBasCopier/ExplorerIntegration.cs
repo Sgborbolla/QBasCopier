@@ -33,11 +33,12 @@ public static class ExplorerIntegration
     public static void Install()
     {
         using var hkcu = Registry.CurrentUser;
-        SetVerb(hkcu, KeyFiles, "Copiar con QBasWing Shuttle · QBasCopier y Transfer", "--copy -- \"%1\"");
-        SetVerb(hkcu, KeyFilesMove, "Mover con QBasWing Shuttle · QBasCopier y Transfer", "--move -- \"%1\"");
-        SetVerb(hkcu, KeyDir, "Copiar con QBasWing Shuttle · QBasCopier y Transfer", "--copy -- \"%1\"");
-        SetVerb(hkcu, KeyDirMove, "Mover con QBasWing Shuttle · QBasCopier y Transfer", "--move -- \"%1\"");
-        SetVerb(hkcu, KeyBg, "Copiar aquí con QBasWing Shuttle · QBasCopier y Transfer…", "--copy -- \"%V\"");
+        SetVerb(hkcu, KeyFiles, "Copiar con QBasWing Shuttle", "--copy --from-shell -- \"%1\"");
+        SetVerb(hkcu, KeyFilesMove, "Mover con QBasWing Shuttle", "--move --from-shell -- \"%1\"");
+        SetVerb(hkcu, KeyDir, "Copiar con QBasWing Shuttle", "--copy --from-shell -- \"%1\"");
+        SetVerb(hkcu, KeyDirMove, "Mover con QBasWing Shuttle", "--move --from-shell -- \"%1\"");
+        // El verbo de "aqui" solo recibe la carpeta; los archivos marcados se leen del Explorador.
+        SetVerb(hkcu, KeyBg, "Copiar aquí con QBasWing Shuttle…", "--copy --from-shell -- \"%V\"");
 
         CreateSendTo();
     }
@@ -50,8 +51,13 @@ public static class ExplorerIntegration
         try
         {
             var sendTo = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), @"Microsoft\Windows\SendTo");
-            var lnk = Path.Combine(sendTo, "QBasCopier-y-Transfer.lnk");
-            if (File.Exists(lnk)) File.Delete(lnk);
+            // Se borran las dos: la de ahora y la de cuando el programa se llamaba de
+            // otra forma, para que al desinstalar no se quede ningun acceso puesto.
+            foreach (var nombre in new[] { "QBasWing-Shuttle.lnk", "QBasCopier-y-Transfer.lnk" })
+            {
+                var lnk = Path.Combine(sendTo, nombre);
+                if (File.Exists(lnk)) File.Delete(lnk);
+            }
         }
         catch { }
     }
@@ -78,9 +84,9 @@ public static class ExplorerIntegration
             dynamic shell = Activator.CreateInstance(t)!;
             dynamic sc = shell.CreateShortcut(lnk);
             sc.TargetPath = ExePath;
-            sc.Arguments = "--copy -- \"%1\""; // SendTo rellena los archivos seleccionados
+            sc.Arguments = "--copy --from-shell -- \"%1\""; // SendTo rellena los archivos seleccionados
             sc.IconLocation = $"{ExePath},0";
-            sc.Description = "Copiar con QBasWing Shuttle · QBasCopier y Transfer";
+            sc.Description = "Copiar con QBasWing Shuttle";
             sc.Save();
         }
         catch { }
@@ -147,7 +153,7 @@ public static class ExplorerIntegration
                 foreach (var k in CopyVerbKeys)
                 {
                     using var cmd = hkcu.CreateSubKey(k);
-                    cmd.SetValue(null, $"\"{ExePath}\" --copy -- \"%1\"");
+                    cmd.SetValue(null, $"\"{ExePath}\" --copy --from-shell -- \"%1\"");
                     // El ExplorerCache son las claves espejo de 32 bits; sin esto el
                     // cambio no se ve en el explorador hasta reiniciar sesion.
                     using var owned = cmd.CreateSubKey("ShuttleOwned");
@@ -195,8 +201,8 @@ public static class ExplorerIntegration
         try
         {
             using var rk = Registry.CurrentUser.OpenSubKey(RunKey, true);
-            if (on) rk?.SetValue("QBasCopier y Transfer", $"\"{ExePath}\" --hidden");
-            else rk?.DeleteValue("QBasCopier y Transfer", false);
+            if (on) rk?.SetValue("QBasWing Shuttle", $"\"{ExePath}\" --hidden");
+            else rk?.DeleteValue("QBasWing Shuttle", false);
         }
         catch { }
     }

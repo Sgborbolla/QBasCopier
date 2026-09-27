@@ -53,6 +53,12 @@ public sealed class TransferPanel : UserControl
     public event Action? CreateHotspot;
     /// <summary>Abre el buscador de archivos para mandarle cosas a ese equipo.</summary>
     public event Action? PickFiles;
+    /// <summary>
+    /// Abre el selector de CARPETAS para mandar un arbol entero. No es lo mismo que
+    /// PickFiles: una carpeta llega en el otro equipo como carpeta, con su estructura
+    /// y su contenido, sin comprimir y sin temporales.
+    /// </summary>
+    public event Action? PickFolder;
 
     public TransferPanel(string deviceName)
     {
@@ -134,6 +140,11 @@ public sealed class TransferPanel : UserControl
         // abre el selector del sistema, que ya sabe filtrar por tipo.
         var pick = Big(L.Get("addFiles"), () => PickFiles?.Invoke(), TextSoft);
 
+        // Carpeta entera, aparte: es lo que mas se manda y no cabe en el selector de
+        // archivos del sistema. Va en su propio boton para que no quepa la duda de
+        // que se puede mandar un arbol entero y no solo archivos sueltos.
+        var pickDir = Big(L.Get("trSendFolder"), () => PickFolder?.Invoke(), TextSoft);
+
         var joinBody = new List<Control> { _code };
 #if !ANDROID
         // En el PC no hay camara, y escribir una direccion a mano es un coñazo:
@@ -166,6 +177,7 @@ public sealed class TransferPanel : UserControl
 #endif
         joinBody.Add(joinBtn);
         joinBody.Add(pick);
+        joinBody.Add(pickDir);
         joinBody.Add(_joinHint);
 
         _joinCard = Card(L.Get("trJoinTitle"), "link", joinBody.ToArray());

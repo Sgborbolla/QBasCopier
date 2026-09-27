@@ -76,7 +76,7 @@ public partial class App : Application
 #endif
             var win = new Window
             {
-                Title = "QBasWing Shuttle · QBasCopier y Transfer - ERROR de arranque",
+                Title = "QBasWing Shuttle - ERROR de arranque",
                 Width = 560,
                 Height = 700,
                 Content = new ScrollViewer { Content = tb }

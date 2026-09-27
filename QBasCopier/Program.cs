@@ -19,7 +19,12 @@ public static class Program
         _cmdEvent = new EventWaitHandle(false, EventResetMode.AutoReset, "QBasCopier_v1_Cmd");
         if (!first)
         {
-            ForwardCommand(args);
+            // Ya hay una copia corriendo en otra ventana. Se le pasa el comando
+            // entero, pero antes se pregunta al Explorador cual es la seleccion
+            // marcada: el "%1" de Windows solo es el primer archivo, y es esta la
+            // unica occasion de leer la seleccion completa, porque es aqui donde el
+            // Explorador sigue siendo la ventana de delante.
+            ForwardCommand(Amplia(args));
             _mutex.Dispose();
             _mutex = null;
             return;
@@ -38,6 +43,31 @@ public static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>().UsePlatformDetect().LogToTrace();
 #endif
+
+    /// <summary>
+    /// Convierte "--copy --from-shell -- ruta" en la lista completa de archivos
+    /// marcados en el Explorador y su carpeta de destino. Si no viene del Explorador,
+    /// la linea de ordenes se queda como estaba.
+    /// </summary>
+    public static string[] Amplia(string[] args)
+    {
+        if (!args.Contains("--from-shell")) return args;
+        var paths = new List<string>();
+        string? dest = null;
+        bool move = false, after = false;
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--copy") after = true;
+            else if (args[i] == "--move") { move = true; after = true; }
+            else if (args[i] == "--dest" && i + 1 < args.Length) dest = args[++i];
+            else if (after && !args[i].StartsWith("--")) paths.Add(args[i]);
+        }
+        ShellSelection.Completa(paths, ref dest, move);
+        var salida = new List<string> { move ? "--move" : "--copy", "--" };
+        salida.AddRange(paths);
+        if (!string.IsNullOrEmpty(dest)) { salida.Add("--dest"); salida.Add(dest); }
+        return salida.ToArray();
+    }
 
     public static void ForwardCommand(string[] args)
     {

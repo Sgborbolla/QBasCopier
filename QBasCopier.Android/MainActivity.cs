@@ -185,6 +185,28 @@ public static class DroidDir
         return cur;
     }
 
+    /// <summary>
+    /// Carpeta NUEVA dentro de dirUri: si el nombre ya esta ocupado se le anade un
+    /// numero, en vez de meter lo nuevo dentro de la que ya habia. Sin esto, dos
+    /// carpetas con el mismo nombre que llegan de equipos distintos acababan
+    /// mezcladas en una sola.
+    /// </summary>
+    public static string? EnsureNewPath(string dirUri, string rel)
+    {
+        var camino = rel.Replace('\\', '/').TrimEnd('/');
+        var i = camino.LastIndexOf('/');
+        var padre = i < 0 ? dirUri : EnsurePath(dirUri, camino.Substring(0, i)) ?? dirUri;
+        var nombre = i < 0 ? camino : camino.Substring(i + 1);
+        if (nombre.Length == 0) return dirUri;
+        for (int n = 1; n < 10000; n++)
+        {
+            var cand = n == 1 ? nombre : nombre + " (" + n + ")";
+            if (FindDir(padre, cand) != null) continue;
+            return EnsureDir(padre, cand);
+        }
+        return EnsureDir(padre, nombre + " (" + Guid.NewGuid().ToString("N")[..6] + ")");
+    }
+
     /// <summary>Existe el archivo (no carpeta) indicado por rel dentro de dirUri.</summary>
     public static bool FileExistsIn(string dirUri, string rel)
     {
@@ -287,8 +309,12 @@ public static class DroidDir
                     else
                     {
                         tiene = true;
-                        var info = DroidFile.Info(h.Uri);
-                        ficheros.Add((r, h.Uri, h.Size > 0 ? h.Size : (info?.Item2 ?? 0), info?.Item3 ?? DateTime.Now));
+                        // El tamaño y la fecha los da el listado de hijos, que ya los
+                        // traia: preguntar uno por uno al proveedor es lo mismo de lento
+                        // y multiplica las llamadas por el numero de archivos.
+                        var tam = h.Size > 0 ? h.Size : DroidFile.Info(h.Uri).Size;
+                        var mod = h.Modified;
+                        ficheros.Add((r, h.Uri, tam, mod));
                     }
                 }
                 // Carpeta sin archivos dentro: se manda igualmente para que el otro
@@ -361,6 +387,33 @@ public static class DroidDir
     /// </summary>
     public static string Downloads() => Doc("primary:Download");
 
+    /// <summary>
+    /// Nombre visible de una carpeta SAF. Es el nombre con el que se vera en el otro
+    /// equipo: nunca la docId, que es un churro que no le dice nada al usuario.
+    /// </summary>
+    public static string Name(string treeUri)
+    {
+        try
+        {
+            var cr = MainActivity.Current?.ContentResolver;
+            if (cr == null) return QBasCopier.L.Get("trFolder");
+            var u = global::Android.Net.Uri.Parse(treeUri);
+            if (u == null) return QBasCopier.L.Get("trFolder");
+            using var c = cr.Query(u, null, null, null, null);
+            if (c != null && c.MoveToFirst())
+            {
+                int i = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnDisplayName);
+                if (i >= 0)
+                {
+                    var n = c.GetString(i);
+                    if (!string.IsNullOrWhiteSpace(n)) return n.Trim();
+                }
+            }
+        }
+        catch (Exception e) { QBasCopier.CrashLog.Info("nombre de carpeta SAF: " + e.Message); }
+        return QBasCopier.L.Get("trFolder");
+    }
+
     /// <summary>URI de un documento del almacenamiento externo ("primary:Download").</summary>
     private static string Doc(string docId)
     {
@@ -370,6 +423,80 @@ public static class DroidDir
             return u?.ToString() ?? "";
         }
         catch { return ""; }
+    }
+
+    const string AuthExterno = "com.android.externalstorage.documents";
+
+    /// <summary>
+    /// Traduce un sitio de destino a algo que el selector de carpetas del sistema sepa
+    /// abrir. Una URI content:// se devuelve tal cual; una ruta del sistema de archivos
+    /// (la SD o un USB, que es como se guardan en la lista de volumenes) se convierte
+    /// en el documento de SAF equivalente.
+    ///
+    /// El identificador del volumen secondary lo decide Android y aqui no se puede dar
+    /// por hecho, asi que lo que se construye se comprueba antes de usarlo: si el
+    /// proveedor no reconoce ese documento se devuelve "" y el selector abre donde
+    /// pueda, que es mejor que abrir en un sitio equivocado. El usuario siempre puede
+    /// elegir la carpeta a mano con "Elegir carpeta...", que si llega a todas.
+    /// </summary>
+    public static string InitialUri(string destino)
+    {
+        if (string.IsNullOrWhiteSpace(destino)) return "";
+        if (destino.StartsWith("content://", StringComparison.OrdinalIgnoreCase)) return destino;
+        try
+        {
+            if (!Directory.Exists(destino)) return "";
+            var sm = MainActivity.Current?.GetSystemService(global::Android.Content.Context.StorageService) as StorageManager;
+            if (sm == null) return "";
+
+            var vol = "primary";
+            var rel = "";
+            var ext = global::Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath ?? "";
+            if (ext.Length > 0 && DentroDe(destino, ext))
+            {
+                rel = Path.GetRelativePath(ext, destino);
+            }
+            else
+            {
+                // SD o USB: el volumen se identifica con el uuid que da el sistema para
+                // ese sitio, que es el unico dato fiable.
+                var uuid = sm.GetUuidForPath(destino);
+                if (uuid == null) return "";
+                string raiz = "";
+                var vols = sm.Volumes;
+                if (vols != null)
+                    foreach (var v in vols)
+                    {
+                        string vp = "";
+                        try { vp = v?.GetPath() ?? ""; } catch { continue; }
+                        if (DentroDe(destino, vp)) { raiz = vp; break; }
+                    }
+                if (raiz.Length == 0) return "";
+                vol = uuid.ToString() ?? "";
+                if (vol.Length == 0) return "";
+                rel = Path.GetRelativePath(raiz, destino);
+            }
+
+            rel = rel.Replace('\\', '/');
+            if (rel == ".") rel = "";
+            var docId = rel.Length == 0 ? vol + ":" : vol + ":" + rel;
+            // El proveedor acepta el separador de dos maneras segun la version: se
+            // prueban las dos y se queda la que exista de verdad.
+            foreach (var cand in new[] { docId, docId.Replace(":", "%3A") })
+            {
+                var u = global::Android.Provider.DocumentsContract.BuildDocumentUri(AuthExterno, cand)?.ToString();
+                if (!string.IsNullOrEmpty(u) && Exists(u)) return u;
+            }
+        }
+        catch (Exception e) { QBasCopier.CrashLog.Info("sitio inicial del selector: " + e.Message); }
+        return "";
+    }
+
+    static bool DentroDe(string ruta, string raiz)
+    {
+        if (raiz.Length == 0) return false;
+        if (string.Equals(ruta.TrimEnd('/'), raiz.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)) return true;
+        return ruta.StartsWith(raiz.TrimEnd('/') + "/", StringComparison.OrdinalIgnoreCase);
     }
 
 }
@@ -401,10 +528,10 @@ public static class DroidList
         catch { return treeUri; }
     }
 
-    // parentUri: un content:// documento; devuelve hijos (documento uri, nombre, esCarpeta, tamaño)
-    public static List<(string Uri, string Name, bool IsDir, long Size)> Children(string parentUri)
+    // parentUri: un content:// documento; devuelve hijos (documento uri, nombre, esCarpeta, tamaño, fecha)
+    public static List<(string Uri, string Name, bool IsDir, long Size, DateTime Modified)> Children(string parentUri)
     {
-        var res = new List<(string, string, bool, long)>();
+        var res = new List<(string, string, bool, long, DateTime)>();
         try
         {
             var cr = MainActivity.Current?.ContentResolver;
@@ -428,12 +555,23 @@ public static class DroidList
                 long size = 0;
                 int si = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnSize);
                 if (si >= 0 && !c.IsNull(si)) size = c.GetLong(si);
+                // La fecha de modificacion viaja en el protocolo para que lo que llegue
+                // tenga las mismas fechas que lo que salio. Si el proveedor no la da, se
+                // deja como ahora: la copia es byte a byte y la fecha es lo de menos.
+                var mod = DateTime.Now;
+                int mi = c.GetColumnIndex(global::Android.Provider.DocumentsContract.Document.ColumnLastModified);
+                if (mi >= 0 && !c.IsNull(mi))
+                {
+                    var ms = c.GetLong(mi);
+                    if (ms > 0)
+                        try { mod = DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime; } catch { }
+                }
                 bool isDir = mime == global::Android.Provider.DocumentsContract.Document.MimeTypeDir;
                 // BuildDocumentUriUsingTree, NO BuildDocumentUri: este ultimo genera
                 // content://auth/document/xx, sin el segmento /tree/, y GetTreeDocumentId
                 // devuelve null -> al entrar en la subcarpeta el listado salia vacio.
                 var childUri = global::Android.Provider.DocumentsContract.BuildDocumentUriUsingTree(pu, docId);
-                res.Add((childUri.ToString(), name, isDir, size));
+                res.Add((childUri.ToString(), name, isDir, size, mod));
             }
         }
         catch { }
@@ -605,7 +743,7 @@ public static class DroidCtx
     }
 }
 
-[Activity(Label = "QBasWing Shuttle · QBasCopier y Transfer", MainLauncher = true, Theme = "@style/MyTheme",
+[Activity(Label = "QBasWing Shuttle", MainLauncher = true, Theme = "@style/MyTheme",
     ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.ScreenLayout | ConfigChanges.Density)]
 public class MainActivity : AvaloniaMainActivity<App>
 {
@@ -632,6 +770,9 @@ public class MainActivity : AvaloniaMainActivity<App>
         // forma de crearlas es con permisos SAF, asi que se le pasa el arbol.
         QBasCopier.TransferHost.EnsureDocDir = DroidDir.EnsurePath;
         QBasCopier.TransferHost.DocExists = DroidDir.FileExistsIn;
+        // Carpeta que aun no exista: dos carpetas con el mismo nombre que llegan de
+        // equipos distintos no se mezclan, la segunda se guarda como "nombre (1)".
+        QBasCopier.TransferHost.NewDocDir = DroidDir.EnsureNewPath;
         base.OnCreate(savedInstanceState);
     }
 
@@ -724,9 +865,11 @@ public class MainActivity : AvaloniaMainActivity<App>
     public void PickTree(Action<string> done) => PickTreeAt("", done);
 
     /// <summary>
-    /// Selector de carpetas del sistema. Con <paramref name="inicio"/> se abre ya
-    /// en ese sitio, que es como se elige "Descargas" o la SD sin tener que
-    /// recorrer el arbol a mano.
+    /// Selector de carpetas del sistema. Con <paramref name="inicio"/> se abre ya en
+    /// ese sitio (Descargas, la SD, un USB...), que es como se elige el destino sin
+    /// tener que recorrer el arbol a mano. Lo que se pasa puede ser una ruta normal o
+    /// una URI de SAF: lo que no se sepa abrir, se deja en blanco y el selector abre
+    /// donde pueda.
     /// </summary>
     public void PickTreeAt(string inicio, Action<string> done)
     {
@@ -737,31 +880,36 @@ public class MainActivity : AvaloniaMainActivity<App>
             try
             {
                 var it = new Intent(Intent.ActionOpenDocumentTree);
-                if (TreeStart.Length > 0)
-                {
-                    try { it.PutExtra("android.provider.extra.INITIAL_URI", global::Android.Net.Uri.Parse(TreeStart)); } catch { }
-                }
+                var donde = DroidDir.InitialUri(TreeStart);
+                if (donde.Length > 0)
+                    try { it.PutExtra("android.provider.extra.INITIAL_URI", global::Android.Net.Uri.Parse(donde)); } catch { }
                 StartActivityForResult(it, ReqTree);
             }
-            catch { var cb0 = TreeCb; TreeCb = null; cb0?.Invoke(""); }
+            catch { var cb0 = TreeCb; TreeCb = null; TreeStart = ""; cb0?.Invoke(""); }
         });
     }
 
     protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
     {
         base.OnActivityResult(requestCode, resultCode, data);
-        if (requestCode == ReqTree && resultCode == Result.Ok && data?.Data != null)
+        if (requestCode == ReqTree)
         {
-            var uri = data.Data!;
-            try
-            {
-                ContentResolver!.TakePersistableUriPermission(uri,
-                    ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
-            }
-            catch { }
+            // Siempre se contesta, tambien si el usuario cancela: si no, quien esta
+            // esperando el selector se queda colgado y no vuelve a preguntar nunca.
             var cb = TreeCb;
             TreeCb = null;
-            cb?.Invoke(uri.ToString());
+            TreeStart = "";
+            var uri = resultCode == Result.Ok ? data?.Data : null;
+            if (uri != null)
+            {
+                try
+                {
+                    ContentResolver!.TakePersistableUriPermission(uri,
+                        ActivityFlags.GrantReadUriPermission | ActivityFlags.GrantWriteUriPermission);
+                }
+                catch { }
+            }
+            cb?.Invoke(uri?.ToString() ?? "");
             return;
         }
         if (requestCode == ReqPick && resultCode == Result.Ok && _pickerCb != null)

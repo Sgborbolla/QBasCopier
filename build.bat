@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-title "QBasWing Shuttle · QBasCopier y Transfer - Build"
+title "QBasWing Shuttle - Build"
 cd /d "%~dp0"
 set "SDK=dotnet"
 
@@ -16,7 +16,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo  [1/4] Publishing QBasCopier^&Transfer (portable, win-x64)...
+echo  [1/4] Publishing QBasWing Shuttle (portable, win-x64)...
 if exist "dist\Windows" rmdir /s /q "dist\Windows" >nul 2>&1
 %SDK% publish "QBasCopier\QBasCopier.csproj" -c Release -r win-x64 --self-contained true ^
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true ^
@@ -29,8 +29,10 @@ rmdir /s /q "dist\windows-tmp" >nul 2>&1
 
 echo  [2/4] Embedding app.exe into the Setup project...
 copy /y "dist\Windows\QBasWing-Shuttle.exe" "QBasCopierSetup\Assets\app.exe" >nul || goto :err
+rem el icono tambien viene de la app; sin el, el instalador no compila
+copy /y "QBasCopier\Assets\app.ico" "QBasCopierSetup\Assets\app.ico" >nul || goto :err
 
-echo  [3/4] Publishing QBasCopier^&Transfer Setup (installer)...
+echo  [3/4] Publishing QBasWing Shuttle Setup (installer)...
 %SDK% publish "QBasCopierSetup\QBasCopierSetup.csproj" -c Release -r win-x64 --self-contained true ^
     -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true ^
     -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:ErrorOnDuplicatePublishOutputFiles=false ^
@@ -54,7 +56,7 @@ exit /b 0
 :err
 echo.
 echo  [ERROR] Build failed. See messages above.
-echo  Fix: make sure the .NET 10 SDK is installed and QBasCopier compiles.
+echo  Fix: make sure the .NET 10 SDK is installed and the app compiles.
 echo.
 pause
 exit /b 1

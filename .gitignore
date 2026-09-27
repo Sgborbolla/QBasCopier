@@ -5,3 +5,8 @@ bin/
 *.user
 .vs/
 .idea/
+# copias que hace build.bat al preparar el instalador
+QBasCopierSetup/Assets/app.exe
+QBasCopierSetup/Assets/app.ico
+__pycache__/
+*.pyc

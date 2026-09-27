@@ -1,9 +1,15 @@
-# QBasCopier — v1.0
+# QBasWing Shuttle
 
 Copiador/movedor ultrarrápido de **QBasWinG** (identidad propia de su creador).
-Programa multi-archivo ultrarrápido, con explorador doble, cola, barras en vivo
-(archivo + global, velocidad, tiempo transcurrido/restante), verificación SHA-256
-opcional, aviso de espacio en disco y **20 idiomas**.
+Programa multi-archivo ultrarrápido, con cola, barras en vivo (archivo + global,
+velocidad, tiempo transcurrido/restante), verificación SHA-256 opcional, aviso de
+espacio en disco y **20 idiomas**.
+
+Al copiar o al mover se abre una **ventanita de progreso** en la esquina: general y
+por archivo, velocidad, tiempo restante, Pausar, Cancelar, Más (lista completa),
+Abrir destino y Reintentar. Cuando termina se va sola. Desde el menú del Explorador
+o de otro gestor de archivos, esa ventanita es lo único que aparece: la ventana
+principal no se abre.
 
 Motor, interfaz y textos 100% propios: paleta, logotipo y marca de
 agua "QBasWing Shuttle © 2026" de QBasWinG. El comportamiento se ha diseñado
@@ -50,14 +56,15 @@ Resultado en `dist\Windows\`:
 ```
 El proyecto Android apunta a `net8.0-android` (LTS estable; .NET 10 aún no
 publica el pack host Mono de Linux necesario para compilar en la nube).
-> Nota experimental: usa los permisos clásicos de almacenamiento (until API 32).
-> Para Android 13+ se adaptaría con SAF (DocumentProvider) en una v2.
+> La copia en Android usa SAF (`content://`) en interno, externo y USB, con el
+> selector del sistema. En el destino se crean solas las carpetas y los archivos
+> repetidos no se pisan.
 
 #### Obtener el APK SIN PC (github.com, gratis)
 1. Crea un repositorio en GitHub y sube el contenido de este ZIP.
 2. Entra en la pestaña **Actions** → workflow **"Compilar APK QBasWing Shuttle"**.
 3. Pulss **Run workflow** (o deja que corra solo al subir).
-4. Al terminar abre el artefacto **QBasCopier-apk**, descarga el `.apk`.
+4. Al terminar abre el artefacto **QBasWing-Shuttle-v1.2-apk**, descarga el `.apk`.
 5. Compártelo con cualquiera (Android pedirá "permitir fuentes desconocidas").
 El APK sale firmado con la clave de depuración automática: vale para instalarlo
 y compartirlo; no es válido para publicarlo en Google Play (eso requiere tu
@@ -68,9 +75,23 @@ No incluido en v1.0 (necesita Mac con Xcode, cuenta de desarrollador y firma).
 Se puede añadir como proyecto esqueleto en una próxima versión.
 
 ## Integración con el sistema
-- **Windows**: menú contextual "Copiar"/"Mover" (y "Copiar aquí…"), SendTo, inicio
-  con Windows, bandeja, instancia única.
+- **Windows**: menú contextual "Copiar con QBasWing Shuttle" / "Mover con…",
+  "Copiar aquí…" en el fondo de una carpeta, opción propia de Ctrl+C / Ctrl+V
+  (con vuelta atrás para restaurar el del sistema), Enviar a, inicio con Windows,
+  bandeja e instancia única. Los verbos leen la **selección marcada entera** del
+  Explorador, no solo el primer archivo.
 - **Linux**: entrada de menú + Scripts de Nautilus.
+
+### Otros gestores de archivos
+Cualquier gestor que deje configurar un comando externo lleva la misma línea:
+
+```
+"<ruta>\QBasWing-Shuttle.exe" --copy -- "<origen>" --dest "<destino>"
+"<ruta>\QBasWing-Shuttle.exe" --move -- "<origen>" --dest "<destino>"
+```
+
+Pasando varias rutas de origen, la copia sale de una. Si la app ya estaba corriendo,
+el comando se le pasa a ella y no se abre una segunda copia.
 
 ## Ajustes (espejo profesional, adaptados)
 Idioma, inicio con Windows / activar al inicio, bandeja/minimizar, unidad de

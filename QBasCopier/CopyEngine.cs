@@ -36,6 +36,14 @@ public sealed class CopyItem : INotifyPropertyChanged
     public string DestPath =>
         IsSafDest ? DestDir.TrimEnd('/') + "/" + Rel : Path.Combine(DestDir, Rel);
 
+    /// <summary>
+    /// SHA-256 del origen, calculado por el camino mientras se copia. Permite
+    /// comprobar el destino releyendolo una sola vez, en vez de releer las dos copias.
+    /// Es null cuando la copia no se ha hecho por el motor (copia nativa, reanudada),
+    /// y entonces la verificacion vuelve a hashear el origen entero.
+    /// </summary>
+    public string? SourceSha { get; set; }
+
     private long _total;
     public long TotalBytes { get => _total; set { _total = value; On(nameof(TotalBytes)); On(nameof(Percent)); } }
 
@@ -115,6 +123,16 @@ public sealed class CopyEngine
 
     public Settings S { get; }
     public List<CopyItem> Items { get; } = new();
+
+    /// <summary>
+    /// Copia de la cola. La UI la mira cada vez que refresca y la lista se esta
+    /// moviendo en los hilos workers; sin esta copia, el recorrido se puede encontrar
+    /// a mitad y revienta.
+    /// </summary>
+    public List<CopyItem> Snapshot()
+    {
+        lock (_lock) return new List<CopyItem>(Items);
+    }
     public bool Move { get; set; }
 
     public Func<CopyItem, string, Task<CollisionDecision>>? AskCollision;
@@ -134,6 +152,25 @@ public sealed class CopyEngine
 
     public long TotalBytes { get => Interlocked.Read(ref _totalBytes); }
     public long DoneBytes { get => Interlocked.Read(ref _doneBytes); }
+
+    /// <summary>
+    /// Cuantos elementos han terminado bien y cuantos con error. Lo consulta la
+    /// ventanita de copia al cerrarse el motor, para saber si puede despedirse sola
+    /// o si tiene que quedarse enseñando el fallo.
+    /// </summary>
+    public int OkCount => _ok;
+    public int ErrCount => _err;
+
+    /// <summary>
+    /// Pone a cero la cuenta de bytes para empezar una cuenta nueva. Se usa al
+    /// reintentar solo lo que fallo: lo ya copiado esta hecho de verdad, pero en esta
+    /// vuelta lo que se esta moviendo son los bytes que faltaban.
+    /// </summary>
+    public void ReiniciaTotales()
+    {
+        _doneBytes = 0;
+        _totalBytes = 0;
+    }
 
     /// <summary>
     /// Progreso de toda la cola, no de un elemento. Es lo que ve el usuario en la
@@ -320,6 +357,7 @@ public sealed class CopyEngine
     // ---------------- copy one ----------------
     private async Task<CopyAction> CopyOneAsync(CopyItem it, CancellationToken ct)
     {
+        if (EsElMismo(it)) return Mark(it, ItemState.Skipped, L.Get("stateSameFile"));
         if (SkipHiddenOrSystem(it)) return Mark(it, ItemState.Skipped, L.Get("stateSkipped"));
 
         if (TryGetSize(it, out var size))
@@ -599,6 +637,12 @@ public sealed class CopyEngine
             await using var src = OpenSource(it);
             if (offset > 0) src.Seek(offset, SeekOrigin.Begin);
 
+            // El hash se va haciendo con lo mismo que se copia, sin releer el archivo
+            // ni cargarlo entero en memoria. Si la copia se reanuda, el hash de esta
+            // pasada no cubre el principio y por eso no se guarda.
+            using var h = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+            var hashable = offset == 0;
+
             var buffer = new byte[buf];
             long done = offset;
             while (done < sourceLen)
@@ -610,6 +654,7 @@ public sealed class CopyEngine
                 if (n <= 0) break;
                 Throttle(n);
                 await dst.WriteAsync(buffer.AsMemory(0, n), ct);
+                if (hashable) h.AppendData(buffer, 0, n);
                 done += n;
                 it.DoneBytes = done;
                 it.TotalBytes = sourceLen;
@@ -617,6 +662,8 @@ public sealed class CopyEngine
                 ItemStatus?.Invoke(it);
                 TotalsChanged?.Invoke();
             }
+            if (hashable && done == sourceLen)
+                it.SourceSha = Convert.ToHexString(h.GetHashAndReset()).ToLowerInvariant();
         }
         finally
         {
@@ -642,9 +689,39 @@ public sealed class CopyEngine
     {
         // En Android el destino puede ser una carpeta SAF (content://). No existe en el
         // sistema de archivos, asi que no se puede crear con Directory.CreateDirectory:
-        // las carpetas se crean a traves de DocumentsContract al abrir cada hijo.
-        if (!it.IsSafDest) Directory.CreateDirectory(it.DestPath);
+        // las carpetas se crean a traves de DocumentsContract, una por una. Se crean
+        // tambien las que se quedan vacias, que si no nunca llegarian al destino.
+#if ANDROID
+        if (it.IsSafDest) QBasCopier.Android.DroidDir.EnsurePath(it.DestDir, it.Rel);
+        else
+#endif
+            Directory.CreateDirectory(it.DestPath);
+
+        // Las carpetas intermedias se crean tambien cuando se quedan vacias: si solo
+        // se recorren los archivos, una carpeta sin nada dentro no llega al destino y
+        // el arbol copiado no es el mismo que el de partida.
+        var vacias = new List<string>();
+        foreach (var d in Directory.EnumerateDirectories(it.SourcePath, "*", SearchOption.AllDirectories))
+        {
+            ct.ThrowIfCancellationRequested();
+            var relD = Path.GetRelativePath(it.SourcePath, d);
+#if ANDROID
+            if (it.IsSafDest)
+            {
+                // En SAF la carpeta se crea aqui y no al abrir un hijo, porque una
+                // carpeta sin archivos no tiene ningun hijo que abrir.
+                QBasCopier.Android.DroidDir.EnsurePath(it.DestDir, CombineRel(it.Rel, relD));
+                continue;
+            }
+#endif
+            var pd = Path.Combine(it.DestPath, relD);
+            Directory.CreateDirectory(pd);
+            try { Directory.SetLastWriteTime(pd, Directory.GetLastWriteTime(d)); } catch { }
+            vacias.Add(relD.Replace('\\', '/'));
+        }
+
         long acc = 0;
+        var copiados = new List<string>();
         foreach (var file in Directory.EnumerateFiles(it.SourcePath, "*", SearchOption.AllDirectories))
         {
             _gate.Wait(ct);
@@ -663,10 +740,53 @@ public sealed class CopyEngine
                 if (!string.IsNullOrEmpty(pd)) Directory.CreateDirectory(pd);
             }
             await CopyFileWithEngineAsync(sub, false, ct);
+            // Cada archivo de la carpeta se comprueba igual que si se copiase suelto.
+            // Sin esto, "verificar" solo miraba los archivos sueltos y una carpeta
+            // defectuosa pasaba por buena entera.
+            if (S.VerifyChecksum) VerifyIntegrity(sub);
+            copiados.Add(rel.Replace('\\', '/'));
             acc += sub.TotalBytes;
             it.DoneBytes = acc;
             ItemStatus?.Invoke(it);
             TotalsChanged?.Invoke();
+        }
+
+        // Y una comprobacion de que no se ha quedado por el camino ningun archivo ni
+        // ninguna carpeta. El destino puede tener mas cosas (se copia dentro de una
+        // carpeta que ya existia), asi que se mira que esten TODOS los de la fuente.
+        if (S.VerifyChecksum) VerificaArbol(it, copiados, vacias);
+    }
+
+    /// <summary>
+    /// Tras copiar una carpeta, comprueba que en el destino estan todos los archivos y
+    /// todas las carpetas de la fuente. Solo mira que falte nada: si el destino ya
+    /// tenia mas cosas, se dejan como estaban.
+    /// </summary>
+    private void VerificaArbol(CopyItem it, List<string> archivos, List<string> carpetas)
+    {
+        if (it.IsSafDest) return;   // en SAF no se puede listar el arbol de forma fiable
+        try
+        {
+            var raiz = it.DestPath;
+            foreach (var rel in archivos)
+            {
+                var dest = Path.Combine(raiz, rel.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(dest)) throw new IOException("No se encontro en el destino: " + rel);
+                var a = new FileInfo(it.SourcePath + Path.DirectorySeparatorChar + rel.Replace('/', Path.DirectorySeparatorChar));
+                var b = new FileInfo(dest);
+                if (a.Length != b.Length)
+                    throw new IOException("Cambio de tamano al copiar: " + rel);
+            }
+            foreach (var rel in carpetas)
+            {
+                var dest = Path.Combine(raiz, rel.Replace('/', Path.DirectorySeparatorChar));
+                if (!Directory.Exists(dest)) throw new IOException("Falta la carpeta: " + rel);
+            }
+        }
+        catch (Exception e)
+        {
+            CrashLog.Save("ERROR al verificar la carpeta " + it.SourcePath + ": " + e.Message);
+            throw;
         }
     }
 
@@ -711,6 +831,28 @@ public sealed class CopyEngine
     }
 
     /// <summary>Existe ya el destino (archivo o carpeta), sea ruta o SAF.</summary>
+    /// <summary>
+    /// Origen y destino son el mismo archivo. Pasa mucho: al pulsar "Copiar aqui" con
+    /// archivos marcados en la carpeta donde ya estan, el destino es el propio origen.
+    /// Si se abriera para lectura y para escritura a la vez se perderia el archivo, y
+    /// la ventana de colisiones tampoco sirve aqui porque no hay nada que decidir: se
+    /// omite en silencio, que es lo que hace el Explorador.
+    /// </summary>
+    private static bool EsElMismo(CopyItem it)
+    {
+        if (it.IsContent || it.IsSafDest) return false;
+        try
+        {
+            var a = Path.GetFullPath(it.SourcePath);
+            var b = Path.GetFullPath(it.DestPath);
+            if (string.Equals(a, b, StringComparison.OrdinalIgnoreCase)) return true;
+            // Copiar una carpeta dentro de si misma nunca acaba: se Copia y cada vez
+            // hay mas dentro que copiar.
+            return it.IsDirectory && b.StartsWith(a.TrimEnd('/', '\\') + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
     private static bool DestExists(CopyItem it)
     {
 #if ANDROID
@@ -759,14 +901,22 @@ public sealed class CopyEngine
     /// SHA-256 del origen y del destino. Funciona tambien con SAF: antes solo miraba
     /// File.Exists, asi que copiar de /storage a una carpeta SAF con la casilla de
     /// verificacion marcada terminaba siempre en error "missing files".
+    ///
+    /// Si el motor ya calculo el hash del origen al copiar, aqui solo se relee el
+    /// destino: es la mitad de trabajo y da exactamente la misma garantia.
     /// </summary>
     private void VerifyIntegrity(CopyItem it)
     {
-        using var s = OpenSource(it);
-        var h1 = SHA256.HashData(s);
+        string h1;
+        if (!string.IsNullOrEmpty(it.SourceSha)) h1 = it.SourceSha!;
+        else
+        {
+            using var s = OpenSource(it);
+            h1 = Convert.ToHexString(SHA256.HashData(s)).ToLowerInvariant();
+        }
         using var d = OpenDestRead(it);
-        var h2 = SHA256.HashData(d);
-        if (!h1.AsSpan().SequenceEqual(h2))
+        var h2 = Convert.ToHexString(SHA256.HashData(d)).ToLowerInvariant();
+        if (!string.Equals(h1, h2, StringComparison.OrdinalIgnoreCase))
             throw new IOException("SHA-256 mismatch");
     }
 

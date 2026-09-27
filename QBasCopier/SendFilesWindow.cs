@@ -132,16 +132,12 @@ public sealed class SendFilesWindow : Window
     }
 
     /// <summary>
-    /// Abre el buscador y devuelve lo elegido. Se espera el resultado en segundo plano
-    /// para que la llamada se pueda dejar como statement: lo interesante es la ventana,
-    /// no su valor de retorno.
+    /// Abre el buscador y devuelve lo elegido. ShowDialog devuelve una Task, asi que
+    /// esto se espera de verdad: antes se devolvia null sin esperar y no se mandaba
+    /// nunca nada.
     /// </summary>
-    public static string[]? Open(MainWindow owner, string baseUrl)
-    {
-        var win = new SendFilesWindow(owner, baseUrl);
-        _ = win.ShowDialog<string[]?>(MainWindow.Host);
-        return null;
-    }
+    public static Task<string[]?> Open(MainWindow owner, string baseUrl) =>
+        new SendFilesWindow(owner, baseUrl).ShowDialog<string[]?>(MainWindow.Host);
 
     // ------------------------------------------------------------------ interfaz
 

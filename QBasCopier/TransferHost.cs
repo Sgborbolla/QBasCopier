@@ -44,12 +44,15 @@ public sealed class TransferHost : IDisposable
 
     // path/área final donde se guarda el archivo recibido
     public event Action<string, long>? FileReceived;
+    /// <summary>Progreso de lo que esta entrando ahora mismo: cuanto va y cuanto se espera.</summary>
+    public event Action<string, long, long>? Receiving;
+
 
     // Ganchos SAF (los define MainActivity en Android). Permiten servir listados y descargas
     // cuando la carpeta de recibidos es un árbol content:// y no una ruta del sistema de archivos.
     public static Func<string, Stream>? OpenDoc;
     public static Func<string, (string Name, long Size)>? DocInfo;
-    public static Func<string, List<(string Uri, string Name, bool IsDir, long Size)>>? ListDoc;
+    public static Func<string, List<(string Uri, string Name, bool IsDir, long Size, DateTime Modified)>>? ListDoc;
 
     // Escribe directo dentro del árbol SAF (Android): una sola escritura, sin temporal.
     public static Func<string, string, Stream>? WriteDoc;
@@ -66,6 +69,13 @@ public sealed class TransferHost : IDisposable
     /// que el usuario ya tenia ahi.
     /// </summary>
     public static Func<string, string, bool>? DocExists;
+
+    /// <summary>
+    /// Igual que <see cref="EnsureDocDir"/> pero con un nombre que todavia no este en
+    /// uso: dos carpetas con el mismo nombre no se mezclan, la segunda llega como
+    /// "nombre (1)". En el escritorio esto ya lo hace Unique.
+    /// </summary>
+    public static Func<string, string, string?>? NewDocDir;
 
     /// <summary>
     /// Si lo recibido se ordena en la subcarpeta de su tipo. Es lo de siempre
@@ -167,8 +177,12 @@ public sealed class TransferHost : IDisposable
     /// </summary>
     public static string Key = "";
 
-    /// <summary>Tope de seguridad: nadie necesita un archivo de mas de 1 TB por HTTP.</summary>
-    public const long MaxFileBytes = 1024L * 1024 * 1024 * 1024;
+    /// <summary>
+    /// A partir de aqui se avisa en el registro, pero NO se corta la transferencia:
+    /// el programa no pone topes de tamano, y lo que el otro equipo manda llega
+    /// entero. Solo sirve para dejar constancia de que algo muy grande paso.
+    /// </summary>
+    public const long AvisoDeBytes = 1024L * 1024 * 1024 * 1024;
 
     private TcpListener? _tcp;
     private CancellationTokenSource? _cts;
@@ -291,11 +305,9 @@ public sealed class TransferHost : IDisposable
                     return;
                 }
 
-                if (len > MaxFileBytes)
-                {
-                    await WriteTextAsync(ns, "error: archivo demasiado grande");
-                    return;
-                }
+                // Sin tope de tamano: lo que el otro equipo manda, del tamano que sea,
+                // entra entero. Un Content-Length enorme solo se avisa en el registro.
+                if (len > AvisoDeBytes) CrashLog.Save("INFO envio muy grande a la espera: " + Fmt.Human(len));
 
                 var bodyStart = idx + 4;
                 var backlog = got - bodyStart; // bytes del cuerpo que ya llegaron pegados
@@ -316,12 +328,12 @@ public sealed class TransferHost : IDisposable
                         // continuacion, sin comprimir y sin dejar temporal en disco.
                         // Asi el otro recibe la carpeta montada con su contenido, y
                         // da igual lo grande que sea.
-                        var dir = await ReceiveFolderAsync(ns, head, bodyStart, backlog, name);
-                        await WriteTextAsync(ns, dir.Length > 0 ? "ok" : "error");
+                        var (dir, shaDir) = await ReceiveFolderAsync(ns, head, bodyStart, backlog, name);
+                        await WriteTextAsync(ns, dir.Length > 0 ? "ok " + shaDir : "error");
                         return;
                     }
-                    var finalPath = await ReceiveAsync(ns, head, bodyStart, backlog, name, len);
-                    await WriteTextAsync(ns, finalPath.Length > 0 ? "ok" : "error");
+                    var (finalPath, sha) = await ReceiveAsync(ns, head, bodyStart, backlog, name, len);
+                    await WriteTextAsync(ns, finalPath.Length > 0 ? "ok " + sha : "error");
                     return;
                 }
 
@@ -330,7 +342,7 @@ public sealed class TransferHost : IDisposable
                     if (await ServeGetAsync(ns, path, query, method == "HEAD")) return;
                 }
 
-                await WriteTextAsync(ns, "QBasCopier y Transfer listo");
+                await WriteTextAsync(ns, "QBasWing Shuttle listo");
             }
         }
         catch { }
@@ -419,7 +431,7 @@ public sealed class TransferHost : IDisposable
             {
                 var items = ListEntries(Inbox, 0);
                 var sb = new StringBuilder();
-                sb.Append("{\"app\":\"QBasCopier y Transfer\",\"inbox\":\"").Append(JsonStr(Inbox)).Append("\",\"files\":[");
+                sb.Append("{\"app\":\"QBasWing Shuttle\",\"inbox\":\"").Append(JsonStr(Inbox)).Append("\",\"files\":[");
                 for (int i = 0; i < items.Count; i++)
                 {
                     if (i > 0) sb.Append(',');
@@ -452,14 +464,14 @@ public sealed class TransferHost : IDisposable
         var sb = new StringBuilder();
         sb.Append("<!doctype html><html lang=\"es\"><head><meta charset=\"utf-8\">")
           .Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">")
-          .Append("<title>QBasCopier y Transfer</title><style>")
+          .Append("<title>QBasWing Shuttle</title><style>")
           .Append("body{font-family:system-ui,sans-serif;background:#eaf2ff;color:#0d1b3e;margin:0;padding:16px}")
           .Append("h1{font-size:19px;margin:0 0 4px}p{font-size:13px;margin:4px 0 14px}")
           .Append("table{border-collapse:collapse;width:100%;background:#fff;border-radius:10px;overflow:hidden}")
           .Append("th,td{font-size:13px;padding:8px 10px;border-bottom:1px solid #d3e0ff;text-align:left}")
           .Append("a{color:#0b3ea8}input,button{font-size:14px;padding:8px;border-radius:8px;border:1px solid #b9cdf5}")
           .Append("</style></head><body>");
-        sb.Append("<h1>QBasCopier y Transfer</h1>");
+        sb.Append("<h1>QBasWing Shuttle</h1>");
         sb.Append("<p>Equipo: <b>").Append(Html(DeviceName)).Append("</b> &middot; recibidos en: <b>").Append(Html(Inbox)).Append("</b></p>");
         sb.Append("<p>Enviar archivos: el&iacute;ge un archivo y pulsa <b>Enviar</b>. Autom&aacute;ticamente se guarda en la carpeta de recibidos de la otra m&aacute;quina.</p>");
         sb.Append("<form id=f><input type=file id=i multiple><button type=button onclick=go()>Enviar</button></form><p id=s></p>");
@@ -633,7 +645,7 @@ public sealed class TransferHost : IDisposable
     /// que la carpeta pese 2 GB o 200 GB. Al terminar esta montada con su contenido
     /// y con las fechas, igual que si se hubiera copiado a mano.
     /// </summary>
-    private async Task<string> ReceiveFolderAsync(NetworkStream ns, byte[] head, int bodyStart, int backlog, string rawName)
+    private async Task<(string Path, string Sha)> ReceiveFolderAsync(NetworkStream ns, byte[] head, int bodyStart, int backlog, string rawName)
     {
         await _slots.WaitAsync();
         var scratch = System.Buffers.ArrayPool<byte>.Shared.Rent(IoBuf);
@@ -643,6 +655,24 @@ public sealed class TransferHost : IDisposable
         long total = 0;
         var archivos = 0;
         Stream? outS = null;
+        // SHA-256 de la carpeta entera: se va haciendo con la ruta de cada elemento y
+        // el hash de sus bytes, en el mismo orden que va por el cable. El que envia
+        // hace exactamente lo mismo, asi que comparar los dos resultados dice si la
+        // carpeta llego entera y sin retocar, con todo lo que va dentro.
+        using var hCarpeta = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        using var hArchivo = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        // De una carpeta no se sabe cuanto va a venir por adelantado: solo se avisa de
+        // lo que lleva entrado, que es lo unico que se puede saber.
+        var evC = Receiving;
+        long ultimoAvisoC = 0;
+        void AvanzaCarpeta()
+        {
+            if (evC == null) return;
+            var ahora = Environment.TickCount64;
+            if (ahora - ultimoAvisoC < 250) return;
+            ultimoAvisoC = ahora;
+            try { evC(rawName, total, 0); } catch { }
+        }
         try
         {
             // Parte de lo que venia pegado a la cabecera puede ser la primera linea
@@ -682,18 +712,49 @@ public sealed class TransferHost : IDisposable
                 return he;
             }
 
+            // Tolerancia con emisores antiguos, que escribian un "\n" de mas detrás
+            // de cada archivo: aquel blanco se leia como linea vacia y cerraba la
+            // carpeta en la primera entrada. Un blanco solo acaba la carpeta si de
+            // verdad no queda nada mas: si despues llegan datos, era de mas y se
+            // sigue leyendo. Se lee en bloque y con margen, no con cancelacion, para
+            // no perder el byte que esta en camino.
+            var uno = new byte[1];
+            int Chincheta()
+            {
+                if (pos < pendientes.Length) { var b = pendientes.Span[pos]; Devolver(b); return b; }
+                try
+                {
+                    ns.ReadTimeout = 250;
+                    return ns.Read(uno, 0, 1) == 1 ? uno[0] : -1;
+                }
+                catch { return -1; }
+                finally { try { ns.ReadTimeout = 0; } catch { } }
+            }
+
+            void Devolver(byte b)
+            {
+                var np = new byte[pendientes.Length - pos + 1];
+                np[0] = b;
+                pendientes.Span[pos..].CopyTo(np.AsSpan(1));
+                pendientes = np;
+                pos = 0;
+            }
+
             var nombre = Sanitize(rawName);
-            if (nombre.Length == 0) return "";
+            if (nombre.Length == 0) return ("", "");
             var baseDir = InboxFor(Inbox, nombre + ".x");
             bool toDoc = IsSaf(baseDir) && WriteDoc != null && EnsureDocDir != null;
             if (toDoc)
             {
-                carpeta = EnsureDocDir!(baseDir, nombre) ?? "";
-                if (carpeta.Length == 0) return "";
+                // Con SAF se reutilizaba la carpeta si ya existia y se le metia lo nuevo
+                // dentro: dos carpetas con el mismo nombre acababan mezcladas. Aqui se
+                // pide una que no exista todavia, igual que en el escritorio.
+                carpeta = (NewDocDir ?? EnsureDocDir)!(baseDir, nombre) ?? "";
+                if (carpeta.Length == 0) return ("", "");
             }
             else
             {
-                if (IsSaf(baseDir) && EnsureDocDir == null) return "";
+                if (IsSaf(baseDir) && EnsureDocDir == null) return ("", "");
                 try { Directory.CreateDirectory(baseDir); } catch { }
                 carpeta = Unique(Path.Combine(baseDir, nombre));
                 try { Directory.CreateDirectory(carpeta); } catch { }
@@ -702,22 +763,42 @@ public sealed class TransferHost : IDisposable
             while (true)
             {
                 var line = await Linea();
-                if (line.Length == 0) break; // linea vacia = se acabo la carpeta
+                if (line.Length == 0)
+                {
+                    // Linea vacia = fin de la carpeta, salvo que haya mas datos.
+                    if (Chincheta() < 0) break;
+                    continue;
+                }
                 var p1 = line.IndexOf('\t');
-                if (p1 < 0) return "";
+                if (p1 < 0) return ("", "");
                 var p2 = line.IndexOf('\t', p1 + 1);
-                if (p2 < 0) return "";
-                if (!long.TryParse(line[..p1], System.Globalization.NumberStyles.HexNumber, null, out var size)) return "";
+                if (p2 < 0) return ("", "");
+                if (!long.TryParse(line[..p1], System.Globalization.NumberStyles.HexNumber, null, out var size)) return ("", "");
                 long unix = long.TryParse(line[(p1 + 1)..p2], out var u) ? u : 0;
                 var rel = line[(p2 + 1)..];
+
+                // La ruta entra tal cual en el hash de la carpeta, con la misma "/", para
+                // que los dos extremos coincidan incluso con las carpetas vacias.
+                var marcaRuta = Encoding.UTF8.GetBytes(rel + "\n");
+                hCarpeta.AppendData(marcaRuta);
 
                 // Carpeta vacia: el que envia la marca con "/" al final.
                 if (size == 0 && rel.EndsWith('/'))
                 {
-                    if (SafeRel(rel, out var dRel)) { if (toDoc) EnsureDocDir!(carpeta, dRel); else TryMakeDir(Path.Combine(carpeta, dRel)); }
+                    if (SafeRel(rel, out var dRel))
+                    {
+                        if (toDoc) EnsureDocDir!(carpeta, dRel);
+                        else
+                        {
+                            TryMakeDir(Path.Combine(carpeta, dRel));
+                            // Las carpetas vacias tambien llevan su fecha: si no, al
+                            // ordenarlas en el explorador salen todas juntas.
+                            if (unix > 0) try { Directory.SetLastWriteTime(Path.Combine(carpeta, dRel), DateTimeOffset.FromUnixTimeSeconds(unix).LocalDateTime); } catch { }
+                        }
+                    }
                     continue;
                 }
-                if (size < 0 || !SafeRel(rel, out var relOk)) return "";
+                if (size < 0 || !SafeRel(rel, out var relOk)) return ("", "");
                 var relUnix = relOk.Replace('\\', '/');
                 var unixTs = unix > 0 ? DateTimeOffset.FromUnixTimeSeconds(unix).LocalDateTime : DateTime.MinValue;
 
@@ -727,10 +808,10 @@ public sealed class TransferHost : IDisposable
                     var padre = Path.GetDirectoryName(relUnix);
                     var destName = Path.GetFileName(relUnix);
                     var dirUri = string.IsNullOrEmpty(padre) ? carpeta : (EnsureDocDir!(carpeta, padre) ?? carpeta);
-                    if (dirUri.Length == 0) return "";
+                    if (dirUri.Length == 0) return ("", "");
                     var dup = DocExists == null ? destName : UniqueDocName(dirUri, destName);
                     outS = WriteDoc!(dirUri, dup);
-                    if (outS == null) return "";
+                    if (outS == null) return ("", "");
                     final = dirUri + "/" + dup;
                 }
                 else
@@ -744,9 +825,11 @@ public sealed class TransferHost : IDisposable
                 while (left > 0)
                 {
                     int n = await Leer(scratch, 0, (int)Math.Min(left, IoBuf));
-                    if (n <= 0) return "";
+                    if (n <= 0) return ("", "");
                     await outS.WriteAsync(scratch.AsMemory(0, n));
+                    hArchivo.AppendData(scratch, 0, n);
                     left -= n; total += n;
+                    AvanzaCarpeta();
                 }
                 await outS.FlushAsync();
                 try { outS.Dispose(); } catch { }
@@ -755,17 +838,20 @@ public sealed class TransferHost : IDisposable
                 {
                     try { File.SetLastWriteTime(final, unixTs); } catch { }
                 }
+                // El hash del archivo entra en el de la carpeta, en el mismo orden.
+                hCarpeta.AppendData(hArchivo.GetHashAndReset());
                 archivos++;
             }
 
+            var sha = Convert.ToHexString(hCarpeta.GetHashAndReset()).ToLowerInvariant();
             CrashLog.Save("INFO carpeta recibida: " + nombre + " (" + archivos + " archivos, " + Fmt.Human(total) + ")");
             FileReceived?.Invoke(carpeta, total);
-            return carpeta;
+            return (carpeta, sha);
         }
         catch (Exception e)
         {
             CrashLog.Save("ERROR al recibir carpeta: " + e.Message);
-            return "";
+            return ("", "");
         }
         finally
         {
@@ -818,7 +904,7 @@ public sealed class TransferHost : IDisposable
         return sinExt + " (" + Guid.NewGuid().ToString("N")[..6] + ")" + ext;
     }
 
-    private async Task<string> ReceiveAsync(NetworkStream ns, byte[] head, int bodyStart, int backlog, string rawName, long len)
+    private async Task<(string Path, string Sha)> ReceiveAsync(NetworkStream ns, byte[] head, int bodyStart, int backlog, string rawName, long len)
     {
         await _slots.WaitAsync();
         Stream? outS = null;
@@ -826,6 +912,23 @@ public sealed class TransferHost : IDisposable
         // Buffer por recepcion. Antes era uno solo compartido por las 4 ranuras: con dos
         // descargas simultaneas los bloques de una se escribian en el archivo de la otra.
         var scratch = System.Buffers.ArrayPool<byte>.Shared.Rent(IoBuf);
+        // SHA-256 de lo que se escribe, que se devuelve al que envia para que compare
+        // con el suyo: es la garantia de que lo que llego esta entero, sin convertir ni
+        // recortar nada por el camino.
+        using var h = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+        long bytes = backlog;
+        // Progreso para el que espera: como mucho cuatro veces por segundo, que basta
+        // para verlo avanzar y no carga la interfaz de avisos.
+        var ev = Receiving;
+        long ultimoAviso = 0;
+        void Avanza()
+        {
+            if (ev == null) return;
+            var ahora = Environment.TickCount64;
+            if (ahora - ultimoAviso < 250) return;
+            ultimoAviso = ahora;
+            try { ev(rawName, bytes, len >= 0 ? len : 0); } catch { }
+        }
         try
         {
             var name = Sanitize(rawName);
@@ -836,7 +939,7 @@ public sealed class TransferHost : IDisposable
             if (toDoc)
             {
                 outS = WriteDoc!(dest, name);
-                if (outS == null) return "";
+                if (outS == null) return ("", "");
                 writing = "";
             }
             else
@@ -847,11 +950,15 @@ public sealed class TransferHost : IDisposable
                     IoBuf, FileOptions.Asynchronous | FileOptions.SequentialScan);
             }
 
-            long bytes = backlog;
             if (len == -2)
+
             {
-                if (backlog > 0) await outS.WriteAsync(head.AsMemory(bodyStart, backlog));
-                long chunkTotal = 0;
+                    if (backlog > 0)
+                    {
+                        await outS.WriteAsync(head.AsMemory(bodyStart, backlog));
+                        h.AppendData(head, bodyStart, backlog);
+                    }
+                    long chunkTotal = 0;
                 while (true)
                 {
                     var sizeLine = await ReadLineAsync(ns);
@@ -860,43 +967,58 @@ public sealed class TransferHost : IDisposable
                         break;
                     if (size <= 0) break;
                     chunkTotal += size;
-                    if (chunkTotal > MaxFileBytes) { outS.Dispose(); outS = null; return Abandon(writing); }
+                    if (chunkTotal > AvisoDeBytes) CrashLog.Save("INFO archivo muy grande por transferencia: " + Fmt.Human(chunkTotal));
                     long left = size;
                     while (left > 0)
                     {
                         int n = await ns.ReadAsync(scratch.AsMemory(0, (int)Math.Min(left, IoBuf)));
                         if (n <= 0) return Abandon(writing);
                         await outS.WriteAsync(scratch.AsMemory(0, n));
+                        h.AppendData(scratch, 0, n);
                         left -= n;
                         bytes += n;
+                        Avanza();
                     }
                     await ConsumeCrlfAsync(ns);
                 }
             }
             else
             {
-                // len < 0 = longitud desconocida: sin tope, un cliente que nunca cierra
-                // la conexion llenaria el disco. Se corta al pasar del maximo permitido.
-                long left = len >= 0 ? len - backlog : MaxFileBytes - backlog;
+                // Sin Content-Length no hay tope: el bucle termina solo cuando el otro
+                // equipo deja de enviar y cierra. Lo que llega es lo que hay.
+                long left = len >= 0 ? len - backlog : long.MaxValue;
                 if (left <= 0) { outS.Dispose(); outS = null; return Abandon(writing); }
+                if (backlog > 0)
+                {
+                    await outS.WriteAsync(head.AsMemory(bodyStart, backlog));
+                    h.AppendData(head, bodyStart, backlog);
+                }
                 while (left > 0)
                 {
                     int n = await ns.ReadAsync(scratch.AsMemory(0, (int)Math.Min(left, IoBuf)));
                     if (n <= 0) break;
                     await outS.WriteAsync(scratch.AsMemory(0, n));
+                    h.AppendData(scratch, 0, n);
                     bytes += n;
                     left -= n;
+                    Avanza();
                 }
+                if (bytes > AvisoDeBytes) CrashLog.Save("INFO archivo muy grande por transferencia: " + Fmt.Human(bytes));
             }
 
             await outS.FlushAsync();
             outS.Dispose();
             outS = null;
             var finalPath = toDoc ? name : writing;
+            var sha = Convert.ToHexString(h.GetHashAndReset()).ToLowerInvariant();
             FileReceived?.Invoke(finalPath, bytes);
-            return finalPath;
+            return (finalPath, sha);
         }
-        catch { return Abandon(writing); }
+        catch (Exception e)
+        {
+            CrashLog.Save("ERROR al recibir archivo: " + e.Message);
+            return Abandon(writing);
+        }
         finally
         {
             try { outS?.Dispose(); } catch { }
@@ -905,10 +1027,10 @@ public sealed class TransferHost : IDisposable
         }
     }
 
-    private string Abandon(string writing)
+    private (string, string) Abandon(string writing)
     {
         try { if (writing.Length > 0 && File.Exists(writing)) File.Delete(writing); } catch { }
-        return "";
+        return ("", "");
     }
 
     private static async Task ConsumeCrlfAsync(NetworkStream ns)
@@ -1022,6 +1144,10 @@ public static class TransferClient
                 "Connection: close\r\n\r\n");
             await ns.WriteAsync(head.AsMemory(), cts.Token);
 
+            // SHA-256 de lo que sale, sin volver a leer el archivo: se hace en el mismo
+            // paso que se envia. Quien lo recibe devuelve el suyo y se comparan, que es
+            // la garantia de que lo que llego esta byte a byte igual a lo que salio.
+            using var h = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
             long pos = 0;
             using (var src = open())
             {
@@ -1031,6 +1157,7 @@ public static class TransferClient
                     int n = await src.ReadAsync(buf.AsMemory(0, Buf), cts.Token);
                     if (n <= 0) break;
                     await ns.WriteAsync(buf.AsMemory(0, n), cts.Token);
+                    h.AppendData(buf, 0, n);
                     pos += n;
                     progress?.Invoke(pos);
                 }
@@ -1038,18 +1165,66 @@ public static class TransferClient
             await ns.FlushAsync(cts.Token);
             if (total > 0 && pos != total) return -1;
 
-            var resp = new byte[1024];
-            int got = 0;
-            while (got < resp.Length)
-            {
-                int n = await ns.ReadAsync(resp.AsMemory(got, resp.Length - got), cts.Token);
-                if (n <= 0) break;
-                got += n;
-                if (Encoding.UTF8.GetString(resp, 0, got).Contains("200 OK")) break;
-            }
-            return Encoding.UTF8.GetString(resp, 0, got).Contains("200 OK") ? total : -1;
+            var resp = await LeeRespuesta(ns, cts.Token);
+            if (!resp.Contains("200 OK")) return -1;
+            var mio = Convert.ToHexString(h.GetHashAndReset()).ToLowerInvariant();
+            if (!ShaCoincide(mio, ShaDeRespuesta(resp), name)) return -1;
+            return total;
         }
-        catch { return -1; }
+        catch (Exception e)
+        {
+            CrashLog.Save("ERROR al enviar " + name + ": " + e.Message);
+            return -1;
+        }
+    }
+
+    /// <summary>
+    /// Compara el hash de lo que ha salido con el que devuelve el otro equipo. Si no
+    /// coinciden, la transferencia se da por fallida: es preferible avisar de que algo
+    /// llego mal que dejar un archivo a medio camino haciendose pasar por bueno.
+    /// Devuelve false si el otro equipo no ha devuelto hash (no se puede comprobar).
+    /// </summary>
+    private static bool ShaCoincide(string mio, string suyo, string que)
+    {
+        if (suyo.Length != 64) return true;   // no se puede comprobar: no se inventa
+        if (string.Equals(mio, suyo, StringComparison.OrdinalIgnoreCase)) return true;
+        CrashLog.Save("ERROR SHA-256 distinto al recibir " + que + ": envio " + mio + ", llego " + suyo);
+        return false;
+    }
+
+    /// <summary>Lee la respuesta entera del otro equipo (son unos pocos bytes).</summary>
+    private static async Task<string> LeeRespuesta(NetworkStream ns, CancellationToken ct)
+    {
+        var buf = new byte[4096];
+        int got = 0;
+        while (got < buf.Length)
+        {
+            int n = await ns.ReadAsync(buf.AsMemory(got, buf.Length - got), ct);
+            if (n <= 0) break;
+            got += n;
+            if (Encoding.UTF8.GetString(buf, 0, got).Contains("\r\n\r\n")) break;
+        }
+        return Encoding.UTF8.GetString(buf, 0, got);
+    }
+
+    /// <summary>
+    /// Saca el SHA-256 que devuelve quien recibe: va al final del cuerpo de la
+    /// respuesta, detras de la palabra "ok".
+    /// </summary>
+    private static string ShaDeRespuesta(string respuesta)
+    {
+        var i = respuesta.LastIndexOf("\r\n\r\n", StringComparison.Ordinal);
+        var cuerpo = i >= 0 ? respuesta[(i + 4)..] : "";
+        var partes = cuerpo.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (int k = partes.Length - 1; k >= 0; k--)
+            if (partes[k].Length == 64 && EsHex(partes[k])) return partes[k].ToLowerInvariant();
+        return "";
+    }
+
+    private static bool EsHex(string s)
+    {
+        foreach (var c in s) if (!Uri.IsHexDigit(c)) return false;
+        return s.Length > 0;
     }
 
     /// <summary>
@@ -1087,13 +1262,23 @@ public static class TransferClient
 
             long pos = 0;
             var buf = new byte[Buf];
+            // El hash de la carpeta se hace con la ruta de cada elemento y el hash de
+            // sus bytes, en el mismo orden que sale por el cable. Quien lo recibe hace
+            // lo mismo con lo que escribe, y al final se comparan los dos.
+            using var hCarpeta = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
+            using var hArchivo = System.Security.Cryptography.IncrementalHash.CreateHash(System.Security.Cryptography.HashAlgorithmName.SHA256);
             for (int i = 0; i < entradas.Count; i++)
             {
                 ct.ThrowIfCancellationRequested();
                 var e = entradas[i];
                 paso?.Invoke(folderName + " · " + e.Rel);
                 var unix = new DateTimeOffset(e.Modified).ToUnixTimeSeconds();
-                var linea = Encoding.UTF8.GetBytes(e.Size.ToString("x") + "\t" + unix + "\t" + e.Rel.Replace('\\', '/') + "\n");
+                // Carpeta vacia: ya viene marcada con "/" al final en el listado, que es
+                // lo que la distingue de un archivo de cero bytes. Un archivo de cero
+                // bytes va como archivo vacio, que no es lo mismo que una carpeta.
+                var rel = e.Rel.Replace('\\', '/');
+                hCarpeta.AppendData(Encoding.UTF8.GetBytes(rel + "\n"));
+                var linea = Encoding.UTF8.GetBytes(e.Size.ToString("x") + "\t" + unix + "\t" + rel + "\n");
                 await ns.WriteAsync(linea.AsMemory(), ct);
 
                 long left = e.Size;
@@ -1104,27 +1289,38 @@ public static class TransferClient
                         int n = await src.ReadAsync(buf.AsMemory(0, (int)Math.Min(left, Buf)), ct);
                         if (n <= 0) break;
                         await ns.WriteAsync(buf.AsMemory(0, n), ct);
+                        hArchivo.AppendData(buf, 0, n);
                         left -= n; pos += n;
                         progress?.Invoke(pos);
                     }
                 }
-                await ns.WriteAsync("\n"u8.ToArray(), ct);
+                // Si el archivo era mas corto de lo que decia el listado, se ha
+                // cambiado mientras se mandaba: el protocolo se descolocaria, asi que
+                // se corta aqui y no se manda una carpeta corrupta.
+                if (left > 0)
+                {
+                    CrashLog.Save("ERROR al enviar " + folderName + ": " + rel + " cambio durante el envio (faltaron " + Fmt.Human(left) + ")");
+                    return -1;
+                }
+                hCarpeta.AppendData(hArchivo.GetHashAndReset());
+                // Detras de los bytes NO se escribe nada: quien recibe los lee justos
+                // y despues lee la linea siguiente del stream. Un "\n" de mas aqui se
+                // comia la primera linea de la carpeta y la cerraba antes de tiempo.
             }
             await ns.WriteAsync("\n"u8.ToArray(), ct); // linea vacia = fin de la carpeta
             await ns.FlushAsync(ct);
 
-            var resp = new byte[1024];
-            int got = 0;
-            while (got < resp.Length)
-            {
-                int n = await ns.ReadAsync(resp.AsMemory(got, resp.Length - got), ct);
-                if (n <= 0) break;
-                got += n;
-                if (Encoding.UTF8.GetString(resp, 0, got).Contains("200 OK")) break;
-            }
-            return Encoding.UTF8.GetString(resp, 0, got).Contains("200 OK") ? pos : -1;
+            var resp = await LeeRespuesta(ns, ct);
+            if (!resp.Contains("200 OK")) return -1;
+            var mioCarpeta = Convert.ToHexString(hCarpeta.GetHashAndReset()).ToLowerInvariant();
+            if (!ShaCoincide(mioCarpeta, ShaDeRespuesta(resp), folderName)) return -1;
+            return pos;
         }
-        catch { return -1; }
+        catch (Exception e)
+        {
+            CrashLog.Save("ERROR al enviar la carpeta: " + e.Message);
+            return -1;
+        }
     }
 
     private static bool SplitUrl(string baseUrl, out string host, out int port)

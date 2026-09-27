@@ -13,9 +13,9 @@
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     <InformationalVersion>1.0.0</InformationalVersion>
-    <Product>QBasCopier-y-Transfer Setup</Product>
-    <Description>Instalador de QBasCopier con música de fondo.</Description>
-    <Copyright>© 2026 QBasCopier</Copyright>
+    <Product>QBasWing Shuttle</Product>
+    <Description>Instalador de QBasWing Shuttle.</Description>
+    <Copyright>© 2026 QBasWing</Copyright>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
@@ -23,6 +23,14 @@
     <Deterministic>true</Deterministic>
     <DebugType>embedded</DebugType>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- El instalador es 100% WPF. Con UseWindowsForms los "using" automaticos traian
+         tambien System.Windows.Forms, y entonces Application, Button, TextBox... se
+         Trafficaban entre WPF y WinForms y el proyecto no compilaba. -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Generado por build.bat: publish portable del programa principal -->

@@ -35,7 +35,7 @@ public static class CrashLog
         {
 #if ANDROID
             global::Android.App.AlertDialog.Builder b = new(global::Android.App.Application.Context);
-            b.SetTitle("QBasCopier - error");
+            b.SetTitle("QBasWing Shuttle - error");
             b.SetMessage(msg.Length > 6000 ? msg[..6000] : msg);
             b.SetPositiveButton("OK", (s, e) => { });
             b.Show();
@@ -74,7 +74,7 @@ public static class CrashLog
                     if (global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.Q)
                     {
                         var col = new global::Android.Content.ContentValues();
-                        col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, "QBasCopier-crash.txt");
+                        col.Put(global::Android.Provider.MediaStore.MediaColumns.DisplayName, "QBasWing-Shuttle-crash.txt");
                         col.Put(global::Android.Provider.MediaStore.MediaColumns.MimeType, "text/plain");
                         col.Put(global::Android.Provider.MediaStore.MediaColumns.RelativePath, "Download");
                         var uri = cr.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, col);
@@ -93,7 +93,7 @@ public static class CrashLog
                             // Se escribe por ruta: Java.IO.File chocaba con el alias
                             // global using File = System.IO.File del proyecto Android.
                             System.IO.File.WriteAllText(
-                                System.IO.Path.Combine(dl.AbsolutePath ?? "", "QBasCopier-crash.txt"), full);
+                                System.IO.Path.Combine(dl.AbsolutePath ?? "", "QBasWing-Shuttle-crash.txt"), full);
                         }
 #pragma warning restore CA1422, CS0618
                     }

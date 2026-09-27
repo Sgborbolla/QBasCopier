@@ -47,6 +47,7 @@ public sealed class TransferPopup : Window
         _panel.JoinWithCode += code => owner.TrJoinCode(code, _panel);
         _panel.CreateHotspot += () => owner.TrHotspot();
         _panel.PickFiles += () => owner.TrPickForPeer();
+        _panel.PickFolder += () => owner.TrPickFolderAndSend();
 
         var botonera = new StackPanel
         {
