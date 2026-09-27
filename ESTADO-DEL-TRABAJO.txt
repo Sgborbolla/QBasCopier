@@ -1,125 +1,154 @@
 QBasWing Shuttle — estado del trabajo
 ======================================
-Fecha: 2026-09-27 (noche)   ·   Rama: main   ·   Todo esto esta en el cel, sin push.
+Fecha: 2026-09-27 (noche)
+Rama: main   ·   Commit: a554ea2   ·   Arbol limpio, ya subido a GitHub.
+Este fichero es la bitacora: si estas leyendo esto sin memoria, lo que sigue es
+todo lo que hace falta para seguir trabajando.
 
-ESTADO DE COMPILACION
----------------------
-  [OK]  QBasCopier/QBasCopier.csproj  ->  Build succeeded  (dotnet build --no-restore)
-  [??]  QBasCopier.Android            ->  sin verificar; este equipo no tiene el
-                                            workload de Android instalado.
-  [OK]  scripts/check-localizacion.py ->  201 claves x 20 idiomas, "Traducciones OK."
-        (42 claves sin usar en el codigo)
-  [OK]  git diff --check              ->  sin problemas de espacios
-
-LO QUE ESTA HECHO
+COMO ESTA EL REPO
 -----------------
-1. Identidad
-   - AGENTS.md creado: fija QBasWing Shuttle, paquete com.qbaswing.qbascopier y las
-     reglas permanentes (identidad, producto, localizacion, prohibicion de nombrar
-     otras aplicaciones).
-   - Barrido de todo el arbol de trabajo: 0 nombres de otras aplicaciones en .cs,
-     .axaml, .md, .txt, .json, .yml, .csproj y .props. Tambien en comentarios.
-   - QBasCopierSetup/SetupLoc.cs: opcion de integracion del Explorador corregida y
-     comprobada en los 20 idiomas.
-   - README.md, LICENSES.txt y comentarios de codigo reescritos con lenguaje propio.
+  qb/repo esta en el cel, en /data/data/com.termux/files/usr/tmp/opencode/qb/repo.
+  Todo esta commiteado y subido. Se puede seguir trabajando encima tal cual.
 
-2. Localizacion
-   - 18 llamadas A(...) mal formadas corregidas.
-   - Validador reparado y mejorado: entiende terminos tecnicos neutros, textos
-     multiescript y cuenta el uso real de claves sin contar el propio Localization.cs.
-   - Anadido L.F(clave, args) para textos con {0} y {1}.
-   - Anadidas claves de volumen, pregunta inicial, envio de carpeta, resumen,
-     refresco y arrastrar-y-soltar.
+  CREDO DEL PROYECTO: identidad propia, C#, Avalonia 11.3.5, Windows/Linux/macOS/
+  Android, 20 idiomas, paquete com.qbaswing.qbascopier. Copiar, mover y transferir
+  CUALQUIER archivo o carpeta, de cualquier tipo y tamano, byte a byte, sin
+  conversiones, sin ZIP, con streaming. Las carpetas se transfieren como arbol real
+  y con su contenido, no convertidas a archivo.
 
-3. Transferir
-   - TransferPanel: boton para elegir archivos, pegado de codigo en PC y FocusCard.
-   - MainWindow: puente completo (TrSyncPanel, TrJoinCode, TrPickForPeer, TrSend,
-     TryBaseUrl, campo _trPeerUrl) y envio de carpetas.
-   - SendFilesWindow.cs: selector propio de PC (archivos + carpetas, multi, arrastrar).
-   - TransferPopup.cs: ventanita de Transferir para la bandeja.
-   - Bandeja: entradas "Crear", "Unirse" y "Mas opciones" que abren esa ventanita.
-   - TransferHost: X-Folder, ReceiveFolderAsync, SafeRel, DocExists, SortByType.
-   - Protocolo de carpeta (streaming, sin ZIP, sin doble espacio):
-     una linea por elemento -> <bytes en hexadecimal>\t<fecha unix>\t<ruta relativa>\n
-     seguido de los bytes exactos y un \n de separacion.
-   - Android: DroidDir.Walk, DroidDir.Volumes, Downloads, PickTreeAt; MainActivity
-     engancha EnsureDocDir y DocExists; claves volDownloads/volStorage/volSdUsb
-     conectadas; flujo de primera pregunta de destino.
-   - Zips.cs eliminado: no queda ninguna dependencia de ZIP.
-
-4. Errores de compilacion que existian de antes y ya estan arreglados
-   (el repo llevaba tiempo sin compilar bien; por eso la CI solo se quejaba de Ico.cs)
-   - Ico.cs: BeginFigure/EndFigure con los nombres de parametro que no existen, y
-     falta de using Avalonia.Layout.
-   - Explorer.cs: Button.ToolTip -> ToolTip.SetTip, WrapPanel.Spacing (Avalonia no lo
-     tiene) -> margen por boton.
-   - ExplorerIntegration.cs: falta using System.Diagnostics.
-   - App.xaml.cs: .As<>() no existe en Avalonia -> as.
-   - CopyEngine.cs: File.GetAccessControl no existe -> FileInfo.
-   - MainWindow.cs: OpenMenuSheet con el array, ShowAsync con la ventana (MainWindow
-     es un UserControl), WrapPanel.Spacing, ToolTip, lambda sin tipo en _texts,
-     DestPath de solo lectura (ahora se actualiza Rel), TextAlignment mal puesto,
-     MkLbl con 12.5, Ico.SetSize, y bloques #if ANDROID mal puestos.
-   - SendFilesWindow.cs: extension method dentro de clase no estatica, ColumnDefinition
-     con cadenas, Grid.Column en inicializador y ShowDialog sin esperar.
-
-LO QUE FALTA
-------------
-URGENTE (bugs conocidos, codigo ya escrito pero sin probar)
- 1. Envoltura del protocolo de carpetas: el emisor mete "\n" despues de cada archivo
-    y el receptor no lo consume, asi que puede cerrar la carpeta en la primera entrada.
-    Arreglo: no escribir ese "\n" extra, o consumirlo en el servidor.
- 2. Carpetas vacias: se emiten sin "/" al final, asi que el receptor las crea como
-    archivo de cero bytes. Anadir "/" cuando el tamano es 0 y no hay bytes.
- 3. DroidDir.Walk usa DroidFile.Info(...).Item3, pero Info devuelve una tupla de dos.
- 4. MainWindow.ApplyVolume llama a PickTreeAt con los argumentos al reves.
- 5. TrPickForPeer llama a SendFilesWindow.Open y ahora si usa el resultado, pero
-    Open devuelve null porque ShowDialog devuelve Task: hay que hacerlo async de verdad
-    (o llamar a TrSend al cerrarse).
-
-FUNCIONAL
- 6. Android: elegir una CARPETA para enviarla (solo hay selector de archivos) y
-    conectarlo al panel de Transferir.
- 7. Android: los volumes montados (SD/USB) se pasan como ruta y EXTRA_INITIAL_URI
-    quiere content://. Limpiar TreeStart tras cada seleccion.
- 8. Revisar que cancelar la pregunta inicial de destino no deje Transferir apagado.
- 9. SHA-256 extremo a extremo, medicion de velocidad (throughput) y quitar el limite
-    artificial de tamano de TransferHost (el usuario quiere cualquier tamano).
- 10. Verificacion de carpetas en el copiador (ahora solo archivos) y fechas de
-    creación en carpetas vacias.
- 11. Colisiones de nombres en carpetas al recibir: revisar que no se mezclen.
-
-CALIDAD Y CI
- 12. Corregir "종볌별" -> "종류별" en trSort (coreano).
- 13. Limpiar o usar las 39 claves sin usar.
- 14. .gitignore, Directory.Build.props, centralizar version, artefactos, guards
-     CA1416, catch criticos con CrashLog, estado vacio y acabado visual.
- 15. Auditar que toda marca VISIBLE sea QBasWing Shuttle (SetupLoc, README, titulo
-     de la app, banner del protocolo "QBasCopier y Transfer" en TrJoinCode).
- 16. Revisar el historial Git: puede conservar nombres antiguos. No reescribir sin
-     preguntar.
- 17. Verificar el proyecto Android en un equipo con el workload de Android.
- 18. Nada de APK/ZIP, push ni publicar hasta terminar y pedir permiso.
-
-COMO SE SIGUE
+COMO VERIFICAR
 --------------
   cd /data/data/com.termux/files/usr/tmp/opencode/qb/repo
-  dotnet build QBasCopier/QBasCopier.csproj --no-restore -v q -nologo
+  dotnet build QBasCopier/QBasCopier.csproj --no-restore -v q -nologo   # ~45 s
   python3 scripts/check-localizacion.py
   git diff --check
-
-  Para el Android hace falta un equipo con el SDK:
+  Android (NO se puede aqui, este equipo no tiene el workload):
   dotnet build QBasCopier.Android/QBasCopier.Android.csproj -v q -nologo
+  Ojo: dotnet build sin --no-restore tarda 24 min por la red. Usar siempre
+  --no-restore mientras no haya que actualizar paquetes.
 
-FICHEROS TOCADOS HOY
---------------------
-  AGENTS.md (nuevo)                        QBasCopier/MainWindow.cs
-  QBasCopier/SendFilesWindow.cs (nuevo)    QBasCopier/TransferPopup.cs (nuevo)
-  QBasCopier/TransferPanel.cs              QBasCopier/TransferHost.cs
-  QBasCopier/Settings.cs                   QBasCopier/Localization.cs
-  QBasCopier/Explorer.cs                   QBasCopier/Ico.cs
-  QBasCopier/DesktopWindow.cs              QBasCopier/Discovery.cs
-  QBasCopier/CopyEngine.cs                 QBasCopier/App.xaml.cs
-  QBasCopier/ExplorerIntegration.cs        QBasCopier.Android/MainActivity.cs
-  QBasCopierSetup/SetupLoc.cs              README.md
-  LICENSES.txt                             scripts/check-localizacion.py
+ESTADO DE VERIFICACION
+----------------------
+  [OK]  QBasCopier/QBasCopier.csproj  ->  Build succeeded
+  [??]  QBasCopier.Android            ->  NUNCA compilado. Es lo primero que hay
+                                            que hacer en un equipo con el SDK.
+  [OK]  scripts/check-localizacion.py ->  201 claves x 20 idiomas, Traducciones OK.
+        39 claves sin usar en el codigo (las imprime el propio script).
+  [OK]  git diff --check
+
+QUE SE ARREGLO HOY (todo el proyecto volvia a compilar)
+--------------------------------------------------------
+De codigo nuevo mio:
+  - SendFilesWindow.cs: un metodo de extension (GridColumn) dentro de una clase no
+    estatica -> ahora SetValue(Grid.ColumnProperty, n). Ademas ShowDialog devuelve
+    Task, asi que Open devuelve null a proposito (pendiente real, ver abajo).
+  - MainWindow.cs y TransferPopup.cs: un parentesis de mas.
+  - TrPickForPeer era privado y la ventanita de la bandeja lo necesita -> internal.
+
+Del repo, que llevaba tiempo sin compilar (la CI solo se quejaba de Ico.cs porque
+es lo primero que encuentra):
+  - Ico.cs: BeginFigure(..., isClosed:) y EndFigure(closeFigure:) no existen en
+    Avalonia -> EndFigure(false/true); falta using Avalonia.Layout.
+  - ExplorerIntegration.cs: falta using System.Diagnostics (Process no existia).
+  - Explorer.cs y MainWindow.cs: Button.ToolTip -> ToolTip.SetTip(b, texto);
+    WrapPanel NO tiene Spacing en Avalonia -> margen en cada boton.
+  - App.xaml.cs: .As<MainWindow>() -> as MainWindow.
+  - CopyEngine.cs: File.GetAccessControl no existe -> FileInfo.GetAccessControl.
+  - MainWindow.cs: ShowAsync(this) con un UserControl -> ShowAsync(Host) (MainWindow
+    es UserControl, no Window); OpenMenuSheet con el array de tuplas; IconSizeSet no
+    existe -> Ico.SetSize; MkLbl con 12.5; lambda sin tipo en _texts.Add; DestPath
+    es de solo lectura -> se actualiza Rel; HorizontalAlignment = TextAlignment;
+    bloques de Android compilandose en escritorio -> #if ANDROID.
+
+LO QUE SE AÑADIO
+----------------
+  - AGENTS.md: identidad y reglas permanentes.
+  - Barrido de nombres de otras aplicaciones en todo el arbol: 0 resultados en
+    codigo, .axaml, md, txt, json, yml, csproj y props.
+  - Localizacion: 18 llamadas A(...) mal formadas, validador reparado (entiende
+    terminos tecnicos neutros, multiescript y uso real de claves), L.F(clave, args)
+    para {0} y {1}, claves nuevas de volumen/pregunta/carpeta/refresco.
+  - TransferHost: X-Folder, ReceiveFolderAsync, SafeRel, DocExists, SortByType.
+  - TransferPanel: boton de elegir, pegado de codigo en PC, FocusCard.
+  - MainWindow: puente (TrSyncPanel, TrJoinCode, TrPickForPeer, TrSend, TryBaseUrl,
+    _trPeerUrl) y envio de carpetas.
+  - SendFilesWindow.cs: selector propio de PC (archivos + carpetas, multi, drag).
+  - TransferPopup.cs + entradas Crear/Unirse/Mas opciones en la bandeja.
+  - Android: DroidDir.Walk, DroidDir.Volumes, Downloads, PickTreeAt; MainActivity
+    engancha EnsureDocDir y DocExists; claves volDownloads/volStorage/volSdUsb
+    conectadas; primera vez preguntando destino.
+  - Zips.cs eliminado. Cero dependencias de ZIP.
+  - .gitignore: obj/, bin/, *.user, .vs/, .idea/ (antes solo dist/ y *.apk).
+
+DECISIONES YA TOMADAS (no deshacerlas sin motivo)
+-------------------------------------------------
+  - Protocolo de carpeta, linea por elemento:
+        <bytes en hexadecimal>\t<fecha unix>\t<ruta relativa>\n
+    seguido de los bytes exactos y un \n separador. Carpeta vacia = tamano 0 y
+    ruta terminada en "/".
+  - Destino: carpeta de marca (QBasWing Shuttle) con subcarpetas opcionales Fotos,
+    Videos, Musica, Documentos, Instaladores, Otros. SortByType lo apaga.
+  - PC con ancho: dos columnas. Estrecho o movil: apilado. Selector propio con
+    arrastrar y soltar; movil con camara y SAF.
+  - En escritorio dialogos siempre con MainWindow.Host, nunca con this.
+  - Todo lo de Android dentro de #if ANDROID, o no compila en escritorio.
+  - Nada de APK, ZIP, releases ni push sin preguntar.
+
+PENDIENTES, CON UBICACION
+-------------------------
+BUGS DE LOGICA (el codigo esta escrito pero sin probar; la mayoria es mio de hoy)
+
+ 1. Envoltura del protocolo de carpeta. En TransferHost.ReceiveFolderAsync el
+    servidor no se come el "\n" que TransferClient.UploadFolder pone despues de
+    cada archivo, asi que puede cerrar la carpeta en la primera entrada.
+    Arreglo: no escribir ese "\n" extra, o consumirlo en el servidor.
+ 2. Carpetas vacias: ListarCarpeta/MainWindow y UploadFolder las emiten sin "/"
+    final -> el receptor las crea como archivo de cero bytes. Anadir "/" cuando
+    tamano 0 y sin bytes.
+ 3. DroidDir.Walk usa DroidFile.Info(...).Item3, pero Info devuelve una tupla de
+    dos (nombre, tamano). O se anade la fecha, o se usa solo lo que hay.
+ 4. MainWindow.ApplyVolume llama a PickTreeAt con los argumentos al reves.
+ 5. SendFilesWindow.Open devuelve null porque ShowDialog devuelve Task:
+    TrPickForPeer tiene que hacerlo async de verdad, o llamar a TrSend al
+    cerrarse la ventana.
+
+FUNCIONAL
+
+ 6. Android: elegir una CARPETA para enviarla. Solo hay selector de archivos.
+    Conectarlo al panel de Transferir (MainWindow.SendToBaseUrlAsync ya acepta
+    "droiddir:").
+ 7. Android: los volumenes montados (SD/USB) se pasan como ruta y EXTRA_INITIAL_URI
+    quiere content://. Limpiar TreeStart despues de cada seleccion.
+ 8. Revisar que cancelar la pregunta inicial de destino no deje Transferir apagado.
+ 9. SHA-256 extremo a extremo, medir velocidad (throughput) y quitar el limite
+    artificial de tamano de TransferHost: el usuario quiere cualquier tamano.
+10. Verificacion de carpetas en el copiador (ahora solo archivos) y fechas de
+    creacion en carpetas vacias.
+11. Colisiones de nombres al recibir una carpeta: que no se mezclen.
+
+CALIDAD, MARCA Y CI
+
+12. "종볌별" -> "종류별" en trSort (coreano).
+13. Limpiar o usar las 39 claves sin usar.
+14. Marca visible: SetupLoc, README, titulo de la app y el banner del protocolo
+    "QBasCopier y Transfer" que comprueba TrJoinCode. Que todo diga QBasWing Shuttle.
+15. Auditado: el historial tiene un mensaje de commit (98d7d0f) que nombra otra
+    aplicacion. NO reescribir el historial sin preguntar antes.
+16. Centralizar version (Directory.Build.props), artefactos de CI, guards CA1416,
+    catch criticos con CrashLog, estado vacio y acabado visual.
+17. Verificar el proyecto Android en un equipo con el SDK.
+18. Probar de verdad: copiar, mover y transferir carpeta anidada grande de un
+    equipo a otro, y comparar con SHA-256 fuera de la app.
+
+FICHEROS QUE TOCA
+-----------------
+  QBasCopier/TransferHost.cs        protocolo, receptor de carpetas, SAF
+  QBasCopier/MainWindow.cs          UI, Transferir, carpetas, Android, puente
+  QBasCopier/SendFilesWindow.cs     selector de PC (sin verificar)
+  QBasCopier/TransferPopup.cs       ventanita de la bandeja
+  QBasCopier/TransferPanel.cs       panel responsive
+  QBasCopier.Android/MainActivity.cs SAF, volumenes, permisos
+  QBasCopier/Localization.cs        20 idiomas
+  scripts/check-localizacion.py     validador
+  QBasCopier/Settings.cs            TransferSort, TransferInboxAsked
+  AGENTS.md                         reglas permanentes
